@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: biashara-os
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 24.15.0
+      - key: NODE_ENV
+        value: production
+      - key: DEMO_MODE
+        value: "false"
