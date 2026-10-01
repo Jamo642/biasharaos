@@ -1,0 +1,1822 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Biashara OS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+
+    <!-- ══════════════════════════════════════════
+         SIDEBAR
+    ══════════════════════════════════════════ -->
+    <aside class="rail">
+      <!-- Brand -->
+      <div class="brand">
+        <div class="mark">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </div>
+        <div>
+          <strong>Biashara OS</strong>
+          <span>Africa-first Business OS</span>
+        </div>
+      </div>
+
+      <!-- Nav -->
+      <nav class="tabs" aria-label="Workspace modules" role="tablist">
+
+        <div class="nav-section-label">Main</div>
+
+        <a href="#dashboard" role="tab" aria-controls="dashboard">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Dashboard
+        </a>
+        <a href="#sales" role="tab" aria-controls="sales">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 100 7h5a3.5 3.5 0 110 7H6"/></svg>
+          Sales
+        </a>
+        <a href="#purchases" role="tab" aria-controls="purchases">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+          Purchases
+        </a>
+        <a href="#expenses" role="tab" aria-controls="expenses">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+          Expenses
+        </a>
+
+        <div class="nav-section-label">Operations</div>
+
+        <a href="#production" role="tab" aria-controls="production">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M5.34 18.66l-1.41 1.41M12 2v2M12 20v2M4.93 4.93l1.41 1.41M18.66 18.66l1.41 1.41M2 12h2M20 12h2"/></svg>
+          Production
+        </a>
+        <a href="#inventory" role="tab" aria-controls="inventory">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          Inventory
+        </a>
+        <a href="#orders" role="tab" aria-controls="orders">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          Orders
+        </a>
+
+        <div class="nav-section-label">Finance</div>
+
+        <a href="#debts" role="tab" aria-controls="debts">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+          Debts &amp; Credits
+        </a>
+        <a href="#reports" role="tab" aria-controls="reports">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Profit &amp; Loss
+        </a>
+
+        <div class="nav-section-label">People</div>
+
+        <a href="#customers" role="tab" aria-controls="customers">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+          Customers
+        </a>
+        <a href="#suppliers" role="tab" aria-controls="suppliers">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+          Suppliers
+        </a>
+
+        <div class="nav-section-label">AI</div>
+
+        <a href="#gpt" role="tab" aria-controls="gpt">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          Biashara GPT
+        </a>
+
+      </nav>
+
+      <!-- Live workspace indicator -->
+      <div class="mode">
+        <span>Live workspace</span>
+        <strong id="businessName">Biashara OS</strong>
+      </div>
+    </aside>
+
+    <!-- ══════════════════════════════════════════
+         MAIN CONTENT
+    ══════════════════════════════════════════ -->
+    <main>
+      <!-- ── Topbar ── -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <nav class="breadcrumb" aria-label="Page breadcrumb">
+            <span>Biashara OS</span>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-current" id="breadcrumbCurrent">Dashboard</span>
+          </nav>
+        </div>
+
+        <div class="topbar-search">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="search" placeholder="Search anything…" aria-label="Search">
+        </div>
+
+        <div class="topbar-right">
+          <button class="icon-btn" title="Notifications" aria-label="Notifications">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>
+          </button>
+          <button class="icon-btn" title="Settings" aria-label="Settings">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M5.34 18.66l-1.41 1.41M12 2v2M12 20v2M4.93 4.93l1.41 1.41M18.66 18.66l1.41 1.41M2 12h2M20 12h2"/></svg>
+          </button>
+          <div class="user-chip">
+            <div class="avatar">BO</div>
+            <span>Owner</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- ===== DASHBOARD ===== -->
+      <section id="dashboard" class="band db-band" role="tabpanel" tabindex="0">
+
+        <!-- ── Welcome Header ── -->
+        <div class="db-header">
+          <div class="db-welcome">
+            <p class="db-welcome-sub">Welcome back,</p>
+            <h1 class="db-welcome-title" id="dbBusinessName">
+              Your Business
+              <svg class="db-heart-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+            </h1>
+            <p class="db-welcome-desc">Here's how your business is performing.</p>
+          </div>
+          <div class="db-header-right">
+            <div class="db-date-badge">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <span id="dbDateRange">This Month</span>
+            </div>
+            <button id="refreshBtn" class="db-refresh-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        <!-- ── Top 5 KPI Stat Cards ── -->
+        <div class="db-stat-row" id="dbStatRow">
+          <!-- filled by JS -->
+        </div>
+
+        <!-- ── Row 2: Revenue Growth + Profit Overview + Quote Card ── -->
+        <div class="db-mid-row">
+
+          <!-- Revenue Growth (line chart) -->
+          <div class="db-card db-trend-card">
+            <div class="db-card-header">
+              <div>
+                <span class="db-card-title">Revenue Growth</span>
+                <p class="db-card-sub" style="margin:2px 0 0">This month's trend</p>
+              </div>
+              <div class="db-trend-badge-wrap">
+                <span class="db-trend-total-label">Total Revenue</span>
+                <span class="db-card-badge" id="dbTrendTotal">KSh 0</span>
+              </div>
+            </div>
+            <div id="dbRevenueChart" class="db-chart-area"></div>
+            <p class="db-trend-note" id="dbTrendNote"></p>
+          </div>
+
+          <!-- Profit Overview (donut) — matches Engagement Overview card -->
+          <div class="db-card db-donut-card">
+            <div class="db-card-header">
+              <span class="db-card-title">Profit Overview</span>
+            </div>
+            <div class="db-donut-wrap">
+              <div class="db-donut-center-wrap">
+                <svg id="dbDonutSvg" width="150" height="150" viewBox="0 0 150 150">
+                  <circle cx="75" cy="75" r="52" fill="none" stroke="#f0ece6" stroke-width="22"/>
+                  <circle id="dbDonutRevenue" cx="75" cy="75" r="52" fill="none" stroke="#8b5a2b" stroke-width="22"
+                    stroke-dasharray="326 0" stroke-dashoffset="81.5" stroke-linecap="round"
+                    style="transition:stroke-dasharray .7s ease"/>
+                  <circle id="dbDonutExpense" cx="75" cy="75" r="52" fill="none" stroke="#d4a96a" stroke-width="22"
+                    stroke-dasharray="0 326" stroke-dashoffset="81.5" stroke-linecap="round"
+                    style="transition:stroke-dasharray .7s ease"/>
+                  <text x="75" y="68" text-anchor="middle" font-size="22" font-weight="800" fill="#3b2a1a" font-family="Inter,sans-serif" id="dbDonutPct">—</text>
+                  <text x="75" y="84" text-anchor="middle" font-size="10" fill="#a08060" font-family="Inter,sans-serif">Margin</text>
+                </svg>
+              </div>
+              <div class="db-donut-legend">
+                <div class="db-donut-row">
+                  <span class="db-donut-dot" style="background:#8b5a2b"></span>
+                  <span class="db-donut-row-label">Revenue</span>
+                  <strong class="db-donut-row-val" id="dbDonutRevAmt">0</strong>
+                </div>
+                <div class="db-donut-row">
+                  <span class="db-donut-dot" style="background:#d4a96a"></span>
+                  <span class="db-donut-row-label">Expenses</span>
+                  <strong class="db-donut-row-val" id="dbDonutExpAmt">0</strong>
+                </div>
+                <div class="db-donut-row">
+                  <span class="db-donut-dot" style="background:#6b4120"></span>
+                  <span class="db-donut-row-label">Profit</span>
+                  <strong class="db-donut-row-val" id="dbDonutProfAmt">0</strong>
+                </div>
+                <div class="db-donut-row">
+                  <span class="db-donut-dot" style="background:#c8b49a"></span>
+                  <span class="db-donut-row-label">Receivables</span>
+                  <strong class="db-donut-row-val" id="dbDonutRecAmt">0</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Motivational quote card -->
+          <div class="db-card db-quote-card">
+            <div class="db-quote-mark">"</div>
+            <p class="db-quote-text" id="dbQuoteText">Consistency, hard work, and smart decisions build a great business.</p>
+            <p class="db-quote-attr">Our mission is to bring out the best in every client, every day.</p>
+            <div class="db-quote-leaf">
+              <svg viewBox="0 0 80 120" width="70" height="105" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M40 110 Q10 70 20 30 Q30 5 55 10 Q75 15 70 50 Q65 85 40 110Z" fill="#c8a87a" opacity="0.3"/>
+                <path d="M40 110 Q45 60 60 25" stroke="#a07850" stroke-width="1.5" stroke-linecap="round" opacity="0.45"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Row 3: Top Sales + Sales Calendar + Platform/Channel Breakdown ── -->
+        <div class="db-bot-row">
+
+          <!-- Top Performing Sales -->
+          <div class="db-card db-recent-card">
+            <div class="db-card-header">
+              <span class="db-card-title">Top Performing Sales</span>
+            </div>
+            <div id="dbRecentList" class="db-recent-list"></div>
+            <button class="db-view-all-btn" onclick="document.querySelector('[href=\'#sales\']').click()">View All Sales</button>
+          </div>
+
+          <!-- Sales Activity (calendar heatmap) -->
+          <div class="db-card db-cal-card">
+            <div class="db-card-header">
+              <span class="db-card-title">Sales Activity</span>
+              <span class="db-cal-sub" id="dbCalSub">This month</span>
+            </div>
+            <div class="db-cal-grid" id="dbCalGrid"><!-- filled by JS --></div>
+            <div class="db-cal-legend">
+              <span class="db-cal-dot db-cal-dot--more"></span><span>More sales</span>
+              <span class="db-cal-dot db-cal-dot--less"></span><span>Less sales</span>
+            </div>
+          </div>
+
+          <!-- Expense Breakdown (progress bars) -->
+          <div class="db-card db-platform-card">
+            <div class="db-card-header">
+              <span class="db-card-title">Expense Breakdown</span>
+            </div>
+            <div id="dbExpenseChart" class="db-platform-list"></div>
+          </div>
+
+        </div>
+
+        <!-- ── Bottom Banner ── -->
+        <div class="db-banner">
+          <div class="db-banner-item">
+            <div class="db-banner-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 010-5H6"/><path d="M18 9h1.5a2.5 2.5 0 000-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0012 0V2z"/></svg>
+            </div>
+            <div>
+              <strong id="dbBannerTitle">Amazing work!</strong>
+              <p id="dbBannerSub">Your consistency, consistency, and connection are driving real results.</p>
+            </div>
+          </div>
+          <div class="db-banner-item">
+            <div class="db-banner-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            </div>
+            <div>
+              <strong>Keep creating</strong>
+              <p>Keep creating high-quality records.</p>
+            </div>
+          </div>
+          <div class="db-banner-item">
+            <div class="db-banner-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+            </div>
+            <div>
+              <strong>Keep engaging</strong>
+              <p>Keep engaging with your audience.</p>
+            </div>
+          </div>
+          <div class="db-banner-item">
+            <div class="db-banner-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div>
+              <strong>Keep growing</strong>
+              <p>Keep growing your beautiful brand.</p>
+              <p class="db-banner-italic">You're doing great! ♥</p>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ===== SALES ===== -->
+      <section id="sales" class="band" role="tabpanel" tabindex="0">
+
+        <!-- Page header -->
+        <div class="sl-page-header">
+          <div>
+            <h2 class="sl-page-title">Sales</h2>
+            <p class="sl-page-sub">Track, record and analyse your sales performance</p>
+          </div>
+          <button class="sl-add-btn" id="slToggleForm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New Sale
+          </button>
+        </div>
+
+        <!-- Collapsible record form -->
+        <div class="sl-form-wrap" id="slFormWrap" hidden>
+          <div class="sl-form-card">
+            <h3 class="sl-form-title">Record a Sale</h3>
+            <form id="saleForm" class="form-grid">
+              <div class="field"><label>Product / Item</label><input name="product" placeholder="e.g. Steel Doors" required></div>
+              <div class="field"><label>Quantity</label><input name="quantity" type="number" min="0" placeholder="0" required></div>
+              <div class="field"><label>Unit</label><input name="unit" placeholder="pcs / kg / L"></div>
+              <div class="field"><label>Amount (KSh)</label><input name="amount" type="number" min="0" placeholder="0" required></div>
+              <div class="field"><label>Customer</label><input name="customer" placeholder="Customer name (optional)"></div>
+              <div class="field">
+                <label>Payment Status</label>
+                <select name="paymentStatus">
+                  <option value="PAID">Paid</option>
+                  <option value="CREDIT">On Credit (creates debt)</option>
+                </select>
+              </div>
+              <button type="submit" class="full submit-btn">Record Sale</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- ── Row 1: Overview cards (left) + Orders chart (right) ── -->
+        <div class="sl-row sl-row--top">
+
+          <!-- Sales Overview card -->
+          <div class="sl-card sl-overview-card">
+            <h3 class="sl-card-title">Sales Overview</h3>
+
+            <!-- Revenue tile -->
+            <div class="sl-kpi-tile sl-kpi-tile--orange">
+              <div class="sl-kpi-tile-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+              </div>
+              <div class="sl-kpi-tile-body">
+                <strong class="sl-kpi-tile-value" id="slRevenue">KSh 0</strong>
+                <span class="sl-kpi-tile-label">Total Revenue</span>
+                <div class="sl-kpi-tile-trend" id="slRevenueTrend">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                  <span class="sl-trend-pct">—</span>
+                  <span class="sl-trend-label">From Last Month</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Orders tile -->
+            <div class="sl-kpi-tile sl-kpi-tile--purple">
+              <div class="sl-kpi-tile-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              </div>
+              <div class="sl-kpi-tile-body">
+                <strong class="sl-kpi-tile-value" id="slOrders">0</strong>
+                <span class="sl-kpi-tile-label">Total Orders</span>
+                <div class="sl-kpi-tile-trend">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                  <span class="sl-trend-pct" id="slOrdersTrend">—</span>
+                  <span class="sl-trend-label">From Last Month</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Customers tile -->
+            <div class="sl-kpi-tile sl-kpi-tile--teal">
+              <div class="sl-kpi-tile-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+              </div>
+              <div class="sl-kpi-tile-body">
+                <strong class="sl-kpi-tile-value" id="slCustomers">0</strong>
+                <span class="sl-kpi-tile-label">Total Customers</span>
+                <div class="sl-kpi-tile-trend">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                  <span class="sl-trend-pct" id="slCustomersTrend">—</span>
+                  <span class="sl-trend-label">From Last Month</span>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /sl-overview-card -->
+
+          <!-- Orders Overview chart card -->
+          <div class="sl-card sl-chart-card">
+            <div class="sl-chart-header">
+              <h3 class="sl-card-title">Orders Overview</h3>
+              <div class="sl-chart-legend">
+                <span class="sl-legend-dot sl-legend-dot--orange"></span><span>Revenue</span>
+                <span class="sl-legend-dot sl-legend-dot--purple"></span><span>Profit</span>
+              </div>
+            </div>
+            <div id="slOrdersChart" class="sl-chart-area"></div>
+          </div>
+
+        </div><!-- /sl-row--top -->
+
+        <!-- ── Row 2: Sales summary (left) + Analytics donut + Top products ── -->
+        <div class="sl-row sl-row--bottom">
+
+          <!-- Sales summary card -->
+          <div class="sl-card sl-summary-card">
+            <h3 class="sl-card-title">Sales</h3>
+            <div class="sl-summary-stats">
+              <div class="sl-summary-stat">
+                <span class="sl-summary-stat-label">Total Sales</span>
+                <strong class="sl-summary-stat-value" id="slTotalSales">0</strong>
+              </div>
+              <div class="sl-summary-stat">
+                <span class="sl-summary-stat-label">This Month</span>
+                <strong class="sl-summary-stat-value" id="slMonthSales">0</strong>
+              </div>
+              <div class="sl-summary-stat">
+                <span class="sl-summary-stat-label">Today</span>
+                <strong class="sl-summary-stat-value" id="slTodaySales">0</strong>
+              </div>
+            </div>
+            <div class="sl-summary-trend">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+              <span id="slSummaryTrend" class="sl-trend-pct">—</span>
+              <span class="sl-trend-label">increased</span>
+            </div>
+          </div>
+
+          <!-- Sale Analytics donut -->
+          <div class="sl-card sl-donut-card">
+            <h3 class="sl-card-title">Sale Analytics</h3>
+            <div class="sl-donut-wrap">
+              <svg id="slDonutSvg" width="160" height="160" viewBox="0 0 160 160">
+                <!-- background ring -->
+                <circle cx="80" cy="80" r="58" fill="none" stroke="#f0f0f0" stroke-width="22"/>
+                <!-- paid arc (teal) -->
+                <circle id="slDonutPaid" cx="80" cy="80" r="58" fill="none" stroke="#00c8b4" stroke-width="22"
+                  stroke-dasharray="364 0" stroke-dashoffset="91" stroke-linecap="round"
+                  style="transition:stroke-dasharray 0.7s ease"/>
+                <!-- credit arc (purple) -->
+                <circle id="slDonutCredit" cx="80" cy="80" r="58" fill="none" stroke="#8b5cf6" stroke-width="22"
+                  stroke-dasharray="0 364" stroke-dashoffset="91" stroke-linecap="round"
+                  style="transition:stroke-dasharray 0.7s ease; transform:rotate(0deg); transform-origin:center"/>
+                <!-- returned arc (amber) -->
+                <circle id="slDonutReturned" cx="80" cy="80" r="58" fill="none" stroke="#f59e0b" stroke-width="22"
+                  stroke-dasharray="0 364" stroke-dashoffset="91" stroke-linecap="round"
+                  style="transition:stroke-dasharray 0.7s ease; transform:rotate(0deg); transform-origin:center"/>
+                <text x="80" y="76" text-anchor="middle" font-size="22" font-weight="800" fill="#1a2e27" font-family="Inter,sans-serif" id="slDonutPct">—</text>
+                <text x="80" y="94" text-anchor="middle" font-size="11" fill="#7a9991" font-family="Inter,sans-serif">Completed</text>
+              </svg>
+              <div class="sl-donut-labels">
+                <div class="sl-donut-lbl"><span class="sl-donut-dot" style="background:#00c8b4"></span><span id="slDonutPaidPct">—</span><br><small>Completed</small></div>
+                <div class="sl-donut-lbl"><span class="sl-donut-dot" style="background:#8b5cf6"></span><span id="slDonutCreditPct">—</span><br><small>On Credit</small></div>
+                <div class="sl-donut-lbl"><span class="sl-donut-dot" style="background:#f59e0b"></span><span id="slDonutReturnedPct">—</span><br><small>Overdue</small></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Top products table -->
+          <div class="sl-card sl-products-card">
+            <h3 class="sl-card-title">Top Products</h3>
+            <table class="sl-products-table">
+              <thead><tr><th>Product</th><th>Revenue</th><th>Qty</th></tr></thead>
+              <tbody id="slTopProducts"></tbody>
+            </table>
+          </div>
+
+        </div><!-- /sl-row--bottom -->
+
+        <!-- ── Recent sales table ── -->
+        <div class="sl-card sl-recent-card" style="margin-top:18px">
+          <div class="sl-recent-header">
+            <h3 class="sl-card-title" style="margin-bottom:0">Recent Sales</h3>
+            <span class="tag">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Inventory auto-deducted
+            </span>
+          </div>
+          <div class="table-wrap" style="border:none;border-radius:0;margin-top:14px">
+            <table>
+              <thead><tr><th>Date</th><th>Product</th><th>Qty</th><th>Customer</th><th>Amount</th><th>Status</th></tr></thead>
+              <tbody id="salesTable"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ===== PURCHASES ===== -->
+      <section id="purchases" class="band fin-band" role="tabpanel" tabindex="0">
+
+        <div class="fin-topbar">
+          <div>
+            <h2 class="fin-title">Purchases</h2>
+            <p class="fin-subtitle">Detailed overview of your purchase activity</p>
+          </div>
+          <div class="fin-topbar-right">
+            <button class="fin-period-btn active" data-period="month" id="purPeriodMonth">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              This month
+            </button>
+            <button class="fin-period-btn" data-period="week" id="purPeriodWeek">This week</button>
+            <button class="fin-add-btn" id="purToggleForm">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New Purchase
+            </button>
+          </div>
+        </div>
+
+        <!-- Collapsible form -->
+        <div class="fin-form-wrap" id="purFormWrap" hidden>
+          <div class="fin-form-card">
+            <h3 class="fin-form-title">Record a Purchase</h3>
+            <form id="purchaseForm" class="form-grid">
+              <div class="field"><label>Supplier</label><input name="supplier" placeholder="Supplier name (optional)"></div>
+              <div class="field"><label>Item / Material</label><input name="item" placeholder="e.g. Steel" required></div>
+              <div class="field"><label>Quantity</label><input name="quantity" type="number" min="0" placeholder="0" required></div>
+              <div class="field"><label>Unit</label><input name="unit" placeholder="kg / L / pcs"></div>
+              <div class="field"><label>Total Cost (KSh)</label><input name="totalCost" type="number" min="0" placeholder="0" required></div>
+              <div class="field">
+                <label>Payment Status</label>
+                <select name="paymentStatus">
+                  <option value="PAID">Paid</option>
+                  <option value="CREDIT">On Credit (creates payable)</option>
+                </select>
+              </div>
+              <button type="submit" class="full submit-btn">Record Purchase</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- 3 stat cards -->
+        <div class="fin-stat-row">
+          <div class="fin-stat-card fin-stat-card--main">
+            <div class="fin-stat-head"><span class="fin-stat-label">Total Balance</span><span class="fin-currency-pill">KSh</span></div>
+            <div class="fin-stat-value-wrap"><span class="fin-stat-big" id="purTotalBig">0</span><span class="fin-stat-dec">.00</span></div>
+            <div class="fin-stat-meta">
+              <span class="fin-trend fin-trend--up" id="purBalTrend">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+                <span id="purBalTrendLbl">Total spend</span>
+              </span>
+            </div>
+            <div class="fin-stat-chips">
+              <span class="fin-chip" id="purTxnChip">0 transactions</span>
+              <span class="fin-chip" id="purSupChip">0 suppliers</span>
+            </div>
+          </div>
+          <div class="fin-stat-card fin-stat-card--income">
+            <div class="fin-stat-head"><span class="fin-stat-label">Paid</span><span class="fin-currency-pill">KSh</span></div>
+            <div class="fin-stat-value-wrap"><span class="fin-stat-big" id="purPaidBig">0</span><span class="fin-stat-dec">.00</span></div>
+            <div class="fin-stat-meta">
+              <span class="fin-trend fin-trend--up">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+                Settled
+              </span>
+            </div>
+            <div class="fin-stat-chips">
+              <span class="fin-chip" id="purPaidChip">0 transactions</span>
+              <span class="fin-chip" id="purPaidPctChip">0% of total</span>
+            </div>
+          </div>
+          <div class="fin-stat-card fin-stat-card--expense">
+            <div class="fin-stat-head"><span class="fin-stat-label">On Credit</span><span class="fin-currency-pill">KSh</span></div>
+            <div class="fin-stat-value-wrap"><span class="fin-stat-big" id="purCreditBig">0</span><span class="fin-stat-dec">.00</span></div>
+            <div class="fin-stat-meta">
+              <span class="fin-trend fin-trend--down">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                Outstanding
+              </span>
+            </div>
+            <div class="fin-stat-chips">
+              <span class="fin-chip" id="purCreditChip">0 transactions</span>
+              <span class="fin-chip" id="purCreditPctChip">0% of total</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mid row: trend + donut -->
+        <div class="fin-mid-row">
+          <div class="fin-chart-card fin-line-card">
+            <div class="fin-chart-header">
+              <div>
+                <h3 class="fin-chart-title">Total balance overview</h3>
+                <div class="fin-chart-legend">
+                  <span class="fin-leg-dot" style="background:#7c5cd8"></span><span>This month</span>
+                  <span class="fin-leg-dot fin-leg-dot--dashed"></span><span>Same period last month</span>
+                  <span class="fin-badge fin-badge--total" id="purLineBadge">Total balance ▾</span>
+                </div>
+              </div>
+            </div>
+            <div id="purLineChart" class="fin-line-chart-area"></div>
+          </div>
+          <div class="fin-chart-card fin-donut-card">
+            <div class="fin-donut-header">
+              <span class="fin-chart-title">Statistics</span>
+              <div class="fin-donut-btns" id="purDonutBtns">
+                <button class="fin-donut-btn active" data-dtype="supplier">Supplier</button>
+                <button class="fin-donut-btn" data-dtype="item">Item</button>
+              </div>
+            </div>
+            <p class="fin-donut-desc" id="purDonutDesc">Spend by supplier this period</p>
+            <div class="fin-donut-wrap">
+              <div class="fin-donut-svg-wrap">
+                <svg id="purDonutSvg" width="180" height="180" viewBox="0 0 180 180">
+                  <circle cx="90" cy="90" r="64" fill="none" stroke="#ede9fe" stroke-width="28"/>
+                </svg>
+                <div class="fin-donut-center">
+                  <small>This period</small>
+                  <strong id="purDonutTotal">KSh 0</strong>
+                </div>
+              </div>
+              <div class="fin-donut-legend" id="purDonutLegend"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom: comparing bar + table -->
+        <div class="fin-bot-row">
+          <div class="fin-chart-card fin-bar-card">
+            <div class="fin-chart-header">
+              <div>
+                <h3 class="fin-chart-title">Comparing of budget and expense</h3>
+                <div class="fin-chart-legend">
+                  <span class="fin-leg-dot" style="background:#7c5cd8"></span><span>Expense</span>
+                  <span class="fin-leg-dot" style="background:#c4b5fd"></span><span>Budget</span>
+                </div>
+              </div>
+              <select class="fin-select" id="purBarPeriod">
+                <option value="month">This year</option>
+                <option value="week">This month</option>
+              </select>
+            </div>
+            <div id="purBarChart" class="fin-bar-chart-area"></div>
+          </div>
+          <div class="fin-table-card">
+            <div class="fin-table-header">
+              <h3 class="fin-chart-title">Recent Purchases</h3>
+              <span class="fin-badge fin-badge--count" id="purTableBadge">0 records</span>
+            </div>
+            <div class="oh-table-wrap">
+              <table class="oh-table">
+                <thead>
+                  <tr>
+                    <th class="oh-th-sno">No</th>
+                    <th>Date <span class="oh-sort-icon">⇅</span></th>
+                    <th>Supplier <span class="oh-sort-icon">⇅</span></th>
+                    <th>Item <span class="oh-sort-icon">⇅</span></th>
+                    <th>Cost <span class="oh-sort-icon">⇅</span></th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="purchasesTable"></tbody>
+              </table>
+            </div>
+            <div class="oh-pagination" id="purPagination"></div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ===== EXPENSES ===== -->
+      <section id="expenses" class="band fin-band" role="tabpanel" tabindex="0">
+
+        <div class="fin-topbar">
+          <div>
+            <h2 class="fin-title">Expenses</h2>
+            <p class="fin-subtitle">Detailed overview of your financial situation</p>
+          </div>
+          <div class="fin-topbar-right">
+            <button class="fin-period-btn active" data-period="month" id="expPeriodMonth">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              This month
+            </button>
+            <button class="fin-period-btn" data-period="week" id="expPeriodWeek">This week</button>
+            <button class="fin-add-btn" id="expToggleForm">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New Expense
+            </button>
+          </div>
+        </div>
+
+        <!-- Collapsible form -->
+        <div class="fin-form-wrap" id="expFormWrap" hidden>
+          <div class="fin-form-card">
+            <h3 class="fin-form-title">Record an Expense</h3>
+            <form id="expenseForm" class="form-grid">
+              <div class="field">
+                <label>Category</label>
+                <select name="category" required>
+                  <option value="">Select category</option>
+                  <option value="RENT">Rent</option>
+                  <option value="TRANSPORT">Transport</option>
+                  <option value="FUEL">Fuel</option>
+                  <option value="ELECTRICITY">Electricity</option>
+                  <option value="WATER">Water</option>
+                  <option value="AIRTIME">Airtime / Phone</option>
+                  <option value="WAGES">Wages</option>
+                  <option value="REPAIR">Repair</option>
+                  <option value="MAINTENANCE">Maintenance</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+              <div class="field"><label>Description</label><input name="description" placeholder="Brief description"></div>
+              <div class="field"><label>Amount (KSh)</label><input name="amount" type="number" min="0" placeholder="0" required></div>
+              <button type="submit" class="full submit-btn submit-btn--amber">Record Expense</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- 3 stat cards -->
+        <div class="fin-stat-row">
+          <div class="fin-stat-card fin-stat-card--main">
+            <div class="fin-stat-head"><span class="fin-stat-label">Total Balance</span><span class="fin-currency-pill">USD</span></div>
+            <div class="fin-stat-value-wrap"><span class="fin-stat-big" id="expTotalBig">0</span><span class="fin-stat-dec">.00</span></div>
+            <div class="fin-stat-meta">
+              <span class="fin-trend fin-trend--down" id="expBalTrend">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                <span id="expBalTrendLbl">Total spend</span>
+              </span>
+            </div>
+            <div class="fin-stat-chips">
+              <span class="fin-chip" id="expTxnChip">0 transactions</span>
+              <span class="fin-chip" id="expCatChip">0 categories</span>
+            </div>
+          </div>
+          <div class="fin-stat-card fin-stat-card--income">
+            <div class="fin-stat-head"><span class="fin-stat-label">Income</span><span class="fin-currency-pill">KSh</span></div>
+            <div class="fin-stat-value-wrap"><span class="fin-stat-big" id="expRevBig">0</span><span class="fin-stat-dec">.00</span></div>
+            <div class="fin-stat-meta">
+              <span class="fin-trend fin-trend--up" id="expRevTrend">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+                <span id="expRevTrendLbl">Revenue</span>
+              </span>
+            </div>
+            <div class="fin-stat-chips">
+              <span class="fin-chip" id="expRevTxnChip">0 transactions</span>
+              <span class="fin-chip" id="expRevCatChip">0 customers</span>
+            </div>
+          </div>
+          <div class="fin-stat-card fin-stat-card--expense">
+            <div class="fin-stat-head"><span class="fin-stat-label">Expense</span><span class="fin-currency-pill">KSh</span></div>
+            <div class="fin-stat-value-wrap"><span class="fin-stat-big" id="expExpBig">0</span><span class="fin-stat-dec">.00</span></div>
+            <div class="fin-stat-meta">
+              <span class="fin-trend fin-trend--down" id="expExpTrend">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                <span id="expExpTrendLbl">Outgoing</span>
+              </span>
+            </div>
+            <div class="fin-stat-chips">
+              <span class="fin-chip" id="expExpTxnChip">0 transactions</span>
+              <span class="fin-chip" id="expExpCatChip">0 categories</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mid row: trend + donut -->
+        <div class="fin-mid-row">
+          <div class="fin-chart-card fin-line-card">
+            <div class="fin-chart-header">
+              <div>
+                <h3 class="fin-chart-title">Total balance overview</h3>
+                <div class="fin-chart-legend">
+                  <span class="fin-leg-dot" style="background:#7c5cd8"></span><span>This month</span>
+                  <span class="fin-leg-dot fin-leg-dot--dashed"></span><span>Same period last month</span>
+                  <span class="fin-badge fin-badge--total" id="expLineBadge">Total balance ▾</span>
+                </div>
+              </div>
+            </div>
+            <div id="expLineChart" class="fin-line-chart-area"></div>
+          </div>
+          <div class="fin-chart-card fin-donut-card">
+            <div class="fin-donut-header">
+              <span class="fin-chart-title">Statistics</span>
+              <div class="fin-donut-btns" id="expDonutBtns">
+                <button class="fin-donut-btn active" data-dtype="expense">Expense</button>
+                <button class="fin-donut-btn" data-dtype="income">Income</button>
+              </div>
+            </div>
+            <p class="fin-donut-desc" id="expDonutDesc">You have an increase of expenses in several categories this month</p>
+            <div class="fin-donut-wrap">
+              <div class="fin-donut-svg-wrap">
+                <svg id="expDonutSvg" width="180" height="180" viewBox="0 0 180 180">
+                  <circle cx="90" cy="90" r="64" fill="none" stroke="#ede9fe" stroke-width="28"/>
+                </svg>
+                <div class="fin-donut-center">
+                  <small>This period</small>
+                  <strong id="expDonutTotal">KSh 0</strong>
+                </div>
+              </div>
+              <div class="fin-donut-legend" id="expDonutLegend"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom: comparing bar + table -->
+        <div class="fin-bot-row">
+          <div class="fin-chart-card fin-bar-card">
+            <div class="fin-chart-header">
+              <div>
+                <h3 class="fin-chart-title">Comparing of budget and expense</h3>
+                <div class="fin-chart-legend">
+                  <span class="fin-leg-dot" style="background:#7c5cd8"></span><span>Expense</span>
+                  <span class="fin-leg-dot" style="background:#c4b5fd"></span><span>Budget</span>
+                </div>
+              </div>
+              <select class="fin-select" id="expBarPeriod">
+                <option value="year">This year</option>
+                <option value="month">This month</option>
+              </select>
+            </div>
+            <div id="expBarChart" class="fin-bar-chart-area"></div>
+          </div>
+          <div class="fin-table-card">
+            <div class="fin-table-header">
+              <h3 class="fin-chart-title">Recent Expenses</h3>
+              <span class="fin-badge fin-badge--count" id="expTableBadge">0 records</span>
+            </div>
+            <div class="oh-table-wrap">
+              <table class="oh-table">
+                <thead>
+                  <tr>
+                    <th class="oh-th-sno">No</th>
+                    <th>Date <span class="oh-sort-icon">⇅</span></th>
+                    <th>Category <span class="oh-sort-icon">⇅</span></th>
+                    <th>Description <span class="oh-sort-icon">⇅</span></th>
+                    <th>Amount <span class="oh-sort-icon">⇅</span></th>
+                  </tr>
+                </thead>
+                <tbody id="expensesTable"></tbody>
+              </table>
+            </div>
+            <div class="oh-pagination" id="expPagination"></div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ===== PRODUCTION ===== -->
+      <section id="production" class="band oh-band" role="tabpanel" tabindex="0">
+
+        <div class="oh-topbar">
+          <h2 class="oh-title">Production</h2>
+          <button class="oh-new-btn" id="prodToggleForm">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Record Production
+          </button>
+        </div>
+
+        <!-- Collapsible form -->
+        <div class="oh-form-wrap" id="prodFormWrap" hidden>
+          <div class="oh-form-card">
+            <h3 class="oh-form-title">Record a Production Run</h3>
+            <form id="productionForm" class="form-grid">
+              <div class="field"><label>Product</label><input name="product" placeholder="e.g. Steel Doors" required></div>
+              <div class="field"><label>Quantity Produced</label><input name="quantity" type="number" min="1" placeholder="0" required></div>
+              <div class="field"><label>Material Used</label><input name="material" placeholder="e.g. Steel"></div>
+              <div class="field"><label>Material Quantity</label><input name="materialQuantity" type="number" min="0" placeholder="0"></div>
+              <div class="field"><label>Unit</label><input name="unit" placeholder="kg / L / pcs"></div>
+              <button type="submit" class="full submit-btn submit-btn--purple">Record Production</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Main card — entries + jobs tabs -->
+        <div class="oh-card">
+          <div class="oh-filters">
+            <div class="oh-tabs" role="tablist" id="prodTabList">
+              <button class="oh-tab active" data-filter="entries" role="tab">Production Entries</button>
+              <button class="oh-tab"        data-filter="jobs"    role="tab">Active Jobs</button>
+              <button class="oh-tab"        data-filter="summary" role="tab">Summary</button>
+            </div>
+            <div class="oh-date-range">
+              <div class="oh-date-pill">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <input type="date" id="prodDateFrom" aria-label="From date">
+              </div>
+              <span class="oh-date-to">To</span>
+              <div class="oh-date-pill">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <input type="date" id="prodDateTo" aria-label="To date">
+              </div>
+            </div>
+          </div>
+
+          <!-- Summary cards -->
+          <div class="oh-summary-row" id="prodSummaryRow" hidden>
+            <div class="oh-sum-card oh-sum-card--purple">
+              <span class="oh-sum-label">Total Entries</span>
+              <strong class="oh-sum-value" id="prodSumEntries">0</strong>
+            </div>
+            <div class="oh-sum-card oh-sum-card--blue">
+              <span class="oh-sum-label">Units Produced</span>
+              <strong class="oh-sum-value" id="prodSumUnits">0</strong>
+            </div>
+            <div class="oh-sum-card oh-sum-card--green">
+              <span class="oh-sum-label">Active Jobs</span>
+              <strong class="oh-sum-value" id="prodSumJobs">0</strong>
+            </div>
+            <div class="oh-sum-card oh-sum-card--amber">
+              <span class="oh-sum-label">Completed Jobs</span>
+              <strong class="oh-sum-value" id="prodSumDone">0</strong>
+            </div>
+          </div>
+
+          <div class="oh-table-wrap">
+            <!-- Entries table -->
+            <table class="oh-table" id="prodEntriesTable">
+              <thead>
+                <tr>
+                  <th class="oh-th-sno">S No <span class="oh-sort-icon">⇅</span></th>
+                  <th>Date <span class="oh-sort-icon">⇅</span></th>
+                  <th>Product <span class="oh-sort-icon">⇅</span></th>
+                  <th>Qty Produced <span class="oh-sort-icon">⇅</span></th>
+                  <th>Job <span class="oh-sort-icon">⇅</span></th>
+                  <th>Source <span class="oh-sort-icon">⇅</span></th>
+                </tr>
+              </thead>
+              <tbody id="productionTable"></tbody>
+            </table>
+            <!-- Jobs table -->
+            <table class="oh-table" id="prodJobsTable" hidden>
+              <thead>
+                <tr>
+                  <th class="oh-th-sno">S No <span class="oh-sort-icon">⇅</span></th>
+                  <th>Job No <span class="oh-sort-icon">⇅</span></th>
+                  <th>Product <span class="oh-sort-icon">⇅</span></th>
+                  <th>Target <span class="oh-sort-icon">⇅</span></th>
+                  <th>Completed <span class="oh-sort-icon">⇅</span></th>
+                  <th>Status <span class="oh-sort-icon">⇅</span></th>
+                  <th>Operator</th>
+                </tr>
+              </thead>
+              <tbody id="jobsTable"></tbody>
+            </table>
+          </div>
+
+          <div class="oh-pagination" id="prodPagination"></div>
+        </div>
+      </section>
+
+      <!-- ===== INVENTORY ===== -->
+      <section id="inventory" class="band oh-band" role="tabpanel" tabindex="0">
+
+        <div class="oh-topbar">
+          <h2 class="oh-title">Inventory</h2>
+          <button class="oh-new-btn" id="invToggleForm">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Stock Item
+          </button>
+        </div>
+
+        <!-- Collapsible form -->
+        <div class="oh-form-wrap" id="invFormWrap" hidden>
+          <div class="oh-form-card">
+            <h3 class="oh-form-title">Add a Stock Item</h3>
+            <form id="inventoryForm" class="form-grid">
+              <div class="field"><label>Item Name</label><input name="name" placeholder="e.g. Steel" required></div>
+              <div class="field">
+                <label>Type</label>
+                <select name="type" required>
+                  <option value="material">Raw Material</option>
+                  <option value="product">Finished Product</option>
+                </select>
+              </div>
+              <div class="field"><label>Unit</label><input name="unit" placeholder="kg / L / pcs / units" required></div>
+              <div class="field"><label>Opening Quantity</label><input name="quantity" type="number" min="0" placeholder="0" required></div>
+              <div class="field"><label>Reorder Level</label><input name="reorderLevel" type="number" min="0" placeholder="0"></div>
+              <div class="field"><label>Supplier (optional)</label><input name="supplier" placeholder="Supplier name"></div>
+              <button type="submit" class="full submit-btn">Add Stock Item</button>
+            </form>
+            <p id="inventoryFormStatus" class="form-status" style="margin-top:10px"></p>
+          </div>
+        </div>
+
+        <!-- Main card -->
+        <div class="oh-card">
+          <div class="oh-filters">
+            <div class="oh-tabs" role="tablist" id="invTabList">
+              <button class="oh-tab active" data-filter="all"      role="tab">All Items</button>
+              <button class="oh-tab"        data-filter="material"  role="tab">Raw Materials</button>
+              <button class="oh-tab"        data-filter="product"   role="tab">Finished Goods</button>
+              <button class="oh-tab"        data-filter="low"       role="tab">Low Stock</button>
+              <button class="oh-tab"        data-filter="movements" role="tab">Movements</button>
+            </div>
+          </div>
+
+          <!-- Summary row shown on low-stock tab header -->
+          <div class="oh-summary-row" id="invSummaryRow" hidden>
+            <div class="oh-sum-card oh-sum-card--blue">
+              <span class="oh-sum-label">Total Items</span>
+              <strong class="oh-sum-value" id="invSumTotal">0</strong>
+            </div>
+            <div class="oh-sum-card oh-sum-card--green">
+              <span class="oh-sum-label">Raw Materials</span>
+              <strong class="oh-sum-value" id="invSumMaterials">0</strong>
+            </div>
+            <div class="oh-sum-card oh-sum-card--purple">
+              <span class="oh-sum-label">Finished Goods</span>
+              <strong class="oh-sum-value" id="invSumProducts">0</strong>
+            </div>
+            <div class="oh-sum-card oh-sum-card--red">
+              <span class="oh-sum-label">Low Stock</span>
+              <strong class="oh-sum-value" id="invSumLow">0</strong>
+            </div>
+          </div>
+
+          <div class="oh-table-wrap">
+            <!-- Stock table -->
+            <table class="oh-table" id="invStockTable">
+              <thead>
+                <tr>
+                  <th class="oh-th-sno">S No <span class="oh-sort-icon">⇅</span></th>
+                  <th>Item Name <span class="oh-sort-icon">⇅</span></th>
+                  <th>Type <span class="oh-sort-icon">⇅</span></th>
+                  <th>Quantity <span class="oh-sort-icon">⇅</span></th>
+                  <th>Reorder At <span class="oh-sort-icon">⇅</span></th>
+                  <th>Status <span class="oh-sort-icon">⇅</span></th>
+                </tr>
+              </thead>
+              <tbody id="inventoryTable"></tbody>
+            </table>
+            <!-- Movements table -->
+            <table class="oh-table" id="invMovTable" hidden>
+              <thead>
+                <tr>
+                  <th class="oh-th-sno">S No <span class="oh-sort-icon">⇅</span></th>
+                  <th>Item <span class="oh-sort-icon">⇅</span></th>
+                  <th>Action <span class="oh-sort-icon">⇅</span></th>
+                  <th>Before <span class="oh-sort-icon">⇅</span></th>
+                  <th>After <span class="oh-sort-icon">⇅</span></th>
+                  <th>Source</th>
+                  <th>Date <span class="oh-sort-icon">⇅</span></th>
+                </tr>
+              </thead>
+              <tbody id="invMovementsBody"></tbody>
+            </table>
+          </div>
+
+          <div class="oh-pagination" id="invPagination"></div>
+        </div>
+      </section>
+
+      <!-- ===== DEBTS & CREDITS ===== -->
+      <section id="debts" class="band dc-band" role="tabpanel" tabindex="0">
+
+        <!-- ── Top bar ── -->
+        <div class="dc-topbar">
+          <div>
+            <h2 class="dc-title">Debts &amp; Credits</h2>
+            <p class="dc-subtitle">Full overview of your receivables and payables</p>
+          </div>
+          <div class="dc-topbar-right">
+            <button class="dc-manage-btn" id="dcTogglePayment">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Record Payment
+            </button>
+          </div>
+        </div>
+
+        <!-- ── Collapsible payment forms ── -->
+        <div class="dc-payment-wrap" id="dcPaymentWrap" hidden>
+          <div class="dc-payment-cards">
+            <div class="dc-pay-card">
+              <h3 class="dc-pay-title">Customer Payment</h3>
+              <form id="customerPaymentForm" class="form-grid">
+                <div class="field"><label>Customer Name</label><input name="customer" placeholder="Customer name" required></div>
+                <div class="field"><label>Amount (KSh)</label><input name="amount" type="number" min="0" placeholder="0" required></div>
+                <div class="field">
+                  <label>Method</label>
+                  <select name="method">
+                    <option value="CASH">Cash</option>
+                    <option value="MPESA">M-Pesa</option>
+                    <option value="BANK">Bank</option>
+                  </select>
+                </div>
+                <button type="submit" class="full submit-btn">Record Customer Payment</button>
+              </form>
+            </div>
+            <div class="dc-pay-card">
+              <h3 class="dc-pay-title">Supplier Payment</h3>
+              <form id="supplierPaymentForm" class="form-grid">
+                <div class="field"><label>Supplier Name</label><input name="supplier" placeholder="Supplier name" required></div>
+                <div class="field"><label>Amount (KSh)</label><input name="amount" type="number" min="0" placeholder="0" required></div>
+                <div class="field">
+                  <label>Method</label>
+                  <select name="method">
+                    <option value="CASH">Cash</option>
+                    <option value="MPESA">M-Pesa</option>
+                    <option value="BANK">Bank</option>
+                  </select>
+                </div>
+                <button type="submit" class="full submit-btn submit-btn--amber">Record Supplier Payment</button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── 3 top stat cards ── -->
+        <div class="dc-stat-row">
+
+          <div class="dc-stat-card dc-stat-card--main">
+            <div class="dc-stat-head">
+              <span class="dc-stat-label">Total Balance</span>
+              <span class="dc-currency-pill">KSh</span>
+            </div>
+            <div class="dc-stat-value-wrap">
+              <span class="dc-stat-big" id="dcNetBalance">0</span><span class="dc-stat-dec">.00</span>
+            </div>
+            <div class="dc-stat-meta">
+              <span class="dc-trend dc-trend--up" id="dcBalanceTrend">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+                <span id="dcBalanceTrendLbl">Receivables</span>
+              </span>
+            </div>
+            <div class="dc-stat-chips">
+              <span class="dc-chip" id="dcTotalReceivables">KSh 0 owed to you</span>
+              <span class="dc-chip" id="dcTotalPayables">KSh 0 you owe</span>
+            </div>
+          </div>
+
+          <div class="dc-stat-card dc-stat-card--income">
+            <div class="dc-stat-head">
+              <span class="dc-stat-label">Receivables</span>
+              <span class="dc-currency-pill">KSh</span>
+            </div>
+            <div class="dc-stat-value-wrap">
+              <span class="dc-stat-big" id="dcReceivables">0</span><span class="dc-stat-dec">.00</span>
+            </div>
+            <div class="dc-stat-meta">
+              <span class="dc-trend dc-trend--up">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+                Owed to you
+              </span>
+            </div>
+            <div class="dc-stat-chips">
+              <span class="dc-chip" id="dcCustDebtCount">0 customers</span>
+              <span class="dc-chip" id="dcCustOverdue">0 overdue</span>
+            </div>
+          </div>
+
+          <div class="dc-stat-card dc-stat-card--expense">
+            <div class="dc-stat-head">
+              <span class="dc-stat-label">Payables</span>
+              <span class="dc-currency-pill">KSh</span>
+            </div>
+            <div class="dc-stat-value-wrap">
+              <span class="dc-stat-big" id="dcPayables">0</span><span class="dc-stat-dec">.00</span>
+            </div>
+            <div class="dc-stat-meta">
+              <span class="dc-trend dc-trend--down">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                You owe suppliers
+              </span>
+            </div>
+            <div class="dc-stat-chips">
+              <span class="dc-chip" id="dcSupDebtCount">0 suppliers</span>
+              <span class="dc-chip" id="dcSupOverdue">0 overdue</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ── Mid row: balance overview chart + statistics donut ── -->
+        <div class="dc-mid-row">
+
+          <!-- Balance overview line chart -->
+          <div class="dc-chart-card dc-line-card">
+            <div class="dc-chart-header">
+              <div>
+                <h3 class="dc-chart-title">Balance overview</h3>
+                <div class="dc-chart-legend">
+                  <span class="dc-leg-dot" style="background:#7c5cd8"></span><span>Receivables</span>
+                  <span class="dc-leg-dot" style="background:#fb923c"></span><span>Payables</span>
+                </div>
+              </div>
+              <div class="dc-chart-tabs" id="dcChartTabs">
+                <button class="dc-chart-tab active" data-view="all">All</button>
+                <button class="dc-chart-tab" data-view="receivables">Receivables</button>
+                <button class="dc-chart-tab" data-view="payables">Payables</button>
+              </div>
+            </div>
+            <div id="dcLineChart" class="dc-line-chart-area"></div>
+          </div>
+
+          <!-- Statistics donut -->
+          <div class="dc-chart-card dc-donut-card">
+            <div class="dc-donut-header">
+              <span class="dc-chart-title">Statistics</span>
+              <select class="dc-select" id="dcDonutType">
+                <option value="receivables">Receivables</option>
+                <option value="payables">Payables</option>
+              </select>
+            </div>
+            <p class="dc-donut-desc" id="dcDonutDesc">Top customers by outstanding debt</p>
+            <div class="dc-donut-wrap">
+              <div class="dc-donut-svg-wrap">
+                <svg id="dcDonutSvg" width="180" height="180" viewBox="0 0 180 180">
+                  <circle cx="90" cy="90" r="64" fill="none" stroke="#ede9fe" stroke-width="28"/>
+                </svg>
+                <div class="dc-donut-center">
+                  <small>Outstanding</small>
+                  <strong id="dcDonutTotal">KSh 0</strong>
+                </div>
+              </div>
+              <div class="dc-donut-legend" id="dcDonutLegend"></div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ── Bottom row: comparing table + payment history ── -->
+        <div class="dc-bot-row">
+
+          <!-- Customer debts table card -->
+          <div class="dc-table-card">
+            <div class="dc-table-card-header">
+              <h3 class="dc-chart-title">Customer Debts</h3>
+              <span class="dc-badge dc-badge--green" id="dcCustBadge">0 active</span>
+            </div>
+            <div class="oh-table-wrap">
+              <table class="oh-table">
+                <thead>
+                  <tr>
+                    <th class="oh-th-sno">No</th>
+                    <th>Customer <span class="oh-sort-icon">⇅</span></th>
+                    <th>Owed <span class="oh-sort-icon">⇅</span></th>
+                    <th>Paid <span class="oh-sort-icon">⇅</span></th>
+                    <th>Remaining <span class="oh-sort-icon">⇅</span></th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="customerDebtsTable"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Supplier debts table card -->
+          <div class="dc-table-card">
+            <div class="dc-table-card-header">
+              <h3 class="dc-chart-title">Supplier Payables</h3>
+              <span class="dc-badge dc-badge--amber" id="dcSupBadge">0 active</span>
+            </div>
+            <div class="oh-table-wrap">
+              <table class="oh-table">
+                <thead>
+                  <tr>
+                    <th class="oh-th-sno">No</th>
+                    <th>Supplier <span class="oh-sort-icon">⇅</span></th>
+                    <th>Owed <span class="oh-sort-icon">⇅</span></th>
+                    <th>Paid <span class="oh-sort-icon">⇅</span></th>
+                    <th>Remaining <span class="oh-sort-icon">⇅</span></th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="supplierDebtsTable"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- ===== CUSTOMERS ===== -->
+      <section id="customers" class="band fin-band" role="tabpanel" tabindex="0">
+
+        <!-- Topbar -->
+        <div class="fin-topbar">
+          <div>
+            <h2 class="fin-title">Customers</h2>
+            <p class="fin-subtitle">Manage your customer relationships and outstanding debts</p>
+          </div>
+          <div class="fin-topbar-right">
+            <button class="fin-add-btn" id="custToggleForm">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New Customer
+            </button>
+          </div>
+        </div>
+
+        <!-- Collapsible form -->
+        <div class="fin-form-wrap" id="custFormWrap" hidden>
+          <div class="fin-form-card">
+            <h3 class="fin-form-title">Add a Customer</h3>
+            <form id="customerForm" class="form-grid">
+              <div class="field"><label>Customer Name</label><input name="name" placeholder="e.g. John Kamau" required></div>
+              <div class="field"><label>Phone Number</label><input name="phone" placeholder="+254700000000"></div>
+              <button type="submit" class="full submit-btn">Add Customer</button>
+            </form>
+            <p id="customerFormStatus" class="form-status" style="margin-top:8px"></p>
+          </div>
+        </div>
+
+        <!-- 3 stat cards -->
+        <div class="fin-stat-row">
+          <div class="fin-stat-card fin-stat-card--main">
+            <div class="fin-stat-head"><span class="fin-stat-label">Total Customers</span><span class="fin-currency-pill">#</span></div>
+            <div class="fin-stat-value-wrap"><span class="fin-stat-big" id="custTotalBig">0</span><span class="fin-stat-dec"></span></div>
+            <div class="fin-stat-meta">
+              <span class="fin-trend fin-trend--up">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+                All time
+              </span>
+            </div>
+            <div class="fin-stat-chips">
+              <span class="fin-chip" id="custActiveChip">0 active</span>
+              <span class="fin-chip" id="custDebtChip">0 with debt</span>
+            </div>
+          </div>
+          <div class="fin-stat-card fin-stat-card--income">
+            <div class="fin-stat-head"><span class="fin-stat-label">Total Receivables</span><span class="fin-currency-pill">KSh</span></div>
+            <div class="fin-stat-value-wrap"><span class="fin-stat-big" id="custRecBig">0</span><span class="fin-stat-dec">.00</span></div>
+            <div class="fin-stat-meta">
+              <span class="fin-trend fin-trend--up">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+                Owed to you
+              </span>
+            </div>
+            <div class="fin-stat-chips">
+              <span class="fin-chip" id="custOverdueChip">0 overdue</span>
+              <span class="fin-chip" id="custPaidChip">0 fully paid</span>
+            </div>
+          </div>
+          <div class="fin-stat-card fin-stat-card--expense">
+            <div class="fin-stat-head"><span class="fin-stat-label">Total Revenue</span><span class="fin-currency-pill">KSh</span></div>
+            <div class="fin-stat-value-wrap"><span class="fin-stat-big" id="custRevBig">0</span><span class="fin-stat-dec">.00</span></div>
+            <div class="fin-stat-meta">
+              <span class="fin-trend fin-trend--up">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+                From sales
+              </span>
+            </div>
+            <div class="fin-stat-chips">
+              <span class="fin-chip" id="custSalesChip">0 sales</span>
+              <span class="fin-chip" id="custAvgChip">Avg KSh 0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Table card -->
+        <div class="fin-table-card" style="margin-top:0">
+          <div class="fin-table-header">
+            <h3 class="fin-chart-title">Customer Directory</h3>
+            <span class="fin-badge fin-badge--count" id="custTableBadge">0 customers</span>
+          </div>
+          <div class="oh-table-wrap">
+            <table class="oh-table">
+              <thead>
+                <tr>
+                  <th class="oh-th-sno">No</th>
+                  <th>Name <span class="oh-sort-icon">⇅</span></th>
+                  <th>Phone</th>
+                  <th>Total Purchased</th>
+                  <th>Outstanding Debt</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="customersTable"></tbody>
+            </table>
+          </div>
+          <div class="oh-pagination" id="custPagination"></div>
+        </div>
+
+      </section>
+
+      <!-- ===== SUPPLIERS ===== -->
+      <section id="suppliers" class="band fin-band" role="tabpanel" tabindex="0">
+
+        <!-- Topbar -->
+        <div class="fin-topbar">
+          <div>
+            <h2 class="fin-title">Suppliers</h2>
+            <p class="fin-subtitle">Manage your supplier network and outstanding payables</p>
+          </div>
+          <div class="fin-topbar-right">
+            <button class="fin-add-btn" id="supToggleForm">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New Supplier
+            </button>
+          </div>
+        </div>
+
+        <!-- Collapsible form -->
+        <div class="fin-form-wrap" id="supFormWrap" hidden>
+          <div class="fin-form-card">
+            <h3 class="fin-form-title">Add a Supplier</h3>
+            <form id="supplierForm" class="form-grid">
+              <div class="field"><label>Supplier Name</label><input name="name" placeholder="e.g. Kamukunji Steel Traders" required></div>
+              <div class="field"><label>Phone Number</label><input name="phone" placeholder="+254700000000"></div>
+              <div class="field"><label>Email (optional)</label><input name="email" type="email" placeholder="supplier@email.com"></div>
+              <button type="submit" class="full submit-btn">Add Supplier</button>
+            </form>
+            <p id="supplierFormStatus" class="form-status" style="margin-top:8px"></p>
+          </div>
+        </div>
+
+        <!-- 3 stat cards -->
+        <div class="fin-stat-row">
+          <div class="fin-stat-card fin-stat-card--main">
+            <div class="fin-stat-head"><span class="fin-stat-label">Total Suppliers</span><span class="fin-currency-pill">#</span></div>
+            <div class="fin-stat-value-wrap"><span class="fin-stat-big" id="supTotalBig">0</span><span class="fin-stat-dec"></span></div>
+            <div class="fin-stat-meta">
+              <span class="fin-trend fin-trend--up">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+                All time
+              </span>
+            </div>
+            <div class="fin-stat-chips">
+              <span class="fin-chip" id="supActiveChip">0 active</span>
+              <span class="fin-chip" id="supDebtChip">0 with payables</span>
+            </div>
+          </div>
+          <div class="fin-stat-card fin-stat-card--income">
+            <div class="fin-stat-head"><span class="fin-stat-label">Total Payables</span><span class="fin-currency-pill">KSh</span></div>
+            <div class="fin-stat-value-wrap"><span class="fin-stat-big" id="supPayBig">0</span><span class="fin-stat-dec">.00</span></div>
+            <div class="fin-stat-meta">
+              <span class="fin-trend fin-trend--down">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                You owe
+              </span>
+            </div>
+            <div class="fin-stat-chips">
+              <span class="fin-chip" id="supOverdueChip">0 overdue</span>
+              <span class="fin-chip" id="supPaidChip">0 fully paid</span>
+            </div>
+          </div>
+          <div class="fin-stat-card fin-stat-card--expense">
+            <div class="fin-stat-head"><span class="fin-stat-label">Total Spend</span><span class="fin-currency-pill">KSh</span></div>
+            <div class="fin-stat-value-wrap"><span class="fin-stat-big" id="supSpendBig">0</span><span class="fin-stat-dec">.00</span></div>
+            <div class="fin-stat-meta">
+              <span class="fin-trend fin-trend--up">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+                All purchases
+              </span>
+            </div>
+            <div class="fin-stat-chips">
+              <span class="fin-chip" id="supPurchaseChip">0 purchases</span>
+              <span class="fin-chip" id="supAvgChip">Avg KSh 0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Table card -->
+        <div class="fin-table-card" style="margin-top:0">
+          <div class="fin-table-header">
+            <h3 class="fin-chart-title">Supplier Directory</h3>
+            <span class="fin-badge fin-badge--count" id="supTableBadge">0 suppliers</span>
+          </div>
+          <div class="oh-table-wrap">
+            <table class="oh-table">
+              <thead>
+                <tr>
+                  <th class="oh-th-sno">No</th>
+                  <th>Name <span class="oh-sort-icon">⇅</span></th>
+                  <th>Phone</th>
+                  <th>Email</th>
+                  <th>Total Spend</th>
+                  <th>Outstanding Payable</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="suppliersTable"></tbody>
+            </table>
+          </div>
+          <div class="oh-pagination" id="supPagination"></div>
+        </div>
+
+      </section>
+
+      <!-- ===== REPORTS / P&L ===== -->
+      <section id="reports" class="band pl-band" role="tabpanel" tabindex="0">
+
+        <!-- ── Page header ── -->
+        <div class="pl-topbar">
+          <div>
+            <h2 class="pl-title">Analytics</h2>
+            <p class="pl-subtitle">Detailed overview of your financial situation</p>
+          </div>
+          <div class="pl-period-row">
+            <button class="pl-period-btn active" data-period="month" id="plPeriodMonth">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              This month
+            </button>
+            <button class="pl-period-btn" data-period="week" id="plPeriodWeek">This week</button>
+          </div>
+        </div>
+
+        <!-- ── Top 3 stat cards ── -->
+        <div class="pl-stat-row">
+
+          <!-- Net Profit / Total Balance -->
+          <div class="pl-stat-card pl-stat-card--main">
+            <div class="pl-stat-head">
+              <span class="pl-stat-label">Net Profit</span>
+              <span class="pl-currency-pill">KSh</span>
+            </div>
+            <div class="pl-stat-value-wrap">
+              <span class="pl-stat-big" id="plNetProfit">0</span><span class="pl-stat-dec" id="plNetProfitDec">.00</span>
+            </div>
+            <div class="pl-stat-meta">
+              <span class="pl-trend pl-trend--up" id="plProfitTrend">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+                <span id="plProfitTrendPct">0%</span>
+              </span>
+              <span class="pl-stat-note" id="plProfitNote">profit margin</span>
+            </div>
+            <div class="pl-stat-chips">
+              <span class="pl-chip">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                <span id="plTotalTxns">0 transactions</span>
+              </span>
+              <span class="pl-chip">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                <span id="plExpCats">0 categories</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Revenue / Income -->
+          <div class="pl-stat-card pl-stat-card--income">
+            <div class="pl-stat-head">
+              <span class="pl-stat-label">Revenue</span>
+              <span class="pl-currency-pill">KSh</span>
+            </div>
+            <div class="pl-stat-value-wrap">
+              <span class="pl-stat-big" id="plRevenue">0</span><span class="pl-stat-dec" id="plRevenueDec">.00</span>
+            </div>
+            <div class="pl-stat-meta">
+              <span class="pl-trend pl-trend--up" id="plRevTrend">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+                <span id="plRevTrendPct">0%</span>
+              </span>
+              <span class="pl-stat-note" id="plRevNote">vs last period</span>
+            </div>
+            <div class="pl-stat-chips">
+              <span class="pl-chip">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                <span id="plSalesTxns">0 transactions</span>
+              </span>
+              <span class="pl-chip">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                <span id="plCustomerCount">0 customers</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Expenses -->
+          <div class="pl-stat-card pl-stat-card--expense">
+            <div class="pl-stat-head">
+              <span class="pl-stat-label">Expenses</span>
+              <span class="pl-currency-pill">KSh</span>
+            </div>
+            <div class="pl-stat-value-wrap">
+              <span class="pl-stat-big" id="plExpenses">0</span><span class="pl-stat-dec" id="plExpensesDec">.00</span>
+            </div>
+            <div class="pl-stat-meta">
+              <span class="pl-trend pl-trend--down" id="plExpTrend">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                <span id="plExpTrendPct">0%</span>
+              </span>
+              <span class="pl-stat-note" id="plExpNote">vs last period</span>
+            </div>
+            <div class="pl-stat-chips">
+              <span class="pl-chip">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                <span id="plExpTxns">0 transactions</span>
+              </span>
+              <span class="pl-chip">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                <span id="plExpCatsCount">0 categories</span>
+              </span>
+            </div>
+          </div>
+
+        </div><!-- /pl-stat-row -->
+
+        <!-- ── Middle row: trend chart (left) + Statistics donut (right) ── -->
+        <div class="pl-mid-row">
+
+          <!-- Revenue trend line chart -->
+          <div class="pl-chart-card">
+            <div class="pl-chart-header">
+              <div>
+                <h3 class="pl-chart-title">Revenue &amp; Expense overview</h3>
+                <div class="pl-chart-legend">
+                  <span class="pl-leg-dot" style="background:#7c5cd8"></span><span>This period</span>
+                  <span class="pl-leg-dot" style="background:#c4b5fd;border:1.5px dashed #7c5cd8;background:transparent"></span><span>Last period</span>
+                </div>
+              </div>
+              <div class="pl-chart-controls">
+                <select class="pl-select" id="plChartMetric">
+                  <option value="revenue">Revenue</option>
+                  <option value="profit">Profit</option>
+                </select>
+              </div>
+            </div>
+            <div id="plTrendChart" class="pl-trend-chart-area"></div>
+          </div>
+
+          <!-- Statistics donut card -->
+          <div class="pl-donut-card">
+            <div class="pl-donut-header">
+              <span class="pl-chart-title">Statistics</span>
+              <div class="pl-donut-controls">
+                <select class="pl-select" id="plDonutMetric">
+                  <option value="expense">Expense</option>
+                  <option value="revenue">Revenue</option>
+                </select>
+              </div>
+            </div>
+            <p class="pl-donut-desc" id="plDonutDesc">Expense breakdown by category this period</p>
+            <div class="pl-donut-wrap">
+              <div class="pl-donut-svg-wrap">
+                <svg id="plDonutSvg" width="180" height="180" viewBox="0 0 180 180">
+                  <circle cx="90" cy="90" r="64" fill="none" stroke="#ede9fe" stroke-width="28"/>
+                  <!-- dynamic arcs injected by JS -->
+                </svg>
+                <div class="pl-donut-center">
+                  <small>This period</small>
+                  <strong id="plDonutTotal">KSh 0</strong>
+                </div>
+              </div>
+              <div class="pl-donut-legend" id="plDonutLegend"></div>
+            </div>
+          </div>
+
+        </div><!-- /pl-mid-row -->
+
+        <!-- ── Bottom row: budget vs expense bars + cash position ── -->
+        <div class="pl-bot-row">
+
+          <!-- Comparing Revenue vs Expenses bars -->
+          <div class="pl-chart-card pl-bar-card">
+            <div class="pl-chart-header">
+              <div>
+                <h3 class="pl-chart-title">Revenue vs Expenses</h3>
+                <div class="pl-chart-legend">
+                  <span class="pl-leg-dot" style="background:#7c5cd8"></span><span>Revenue</span>
+                  <span class="pl-leg-dot" style="background:#c4b5fd"></span><span>Expenses</span>
+                </div>
+              </div>
+            </div>
+            <div id="plBarChart" class="pl-bar-chart-area"></div>
+          </div>
+
+          <!-- Cash position + P&L summary -->
+          <div class="pl-summary-card">
+            <h3 class="pl-chart-title" style="margin-bottom:18px">P&amp;L Summary</h3>
+            <div id="plSummaryList" class="pl-summary-list"></div>
+          </div>
+
+        </div><!-- /pl-bot-row -->
+
+      </section>
+
+      <!-- ===== ORDERS ===== -->
+      <section id="orders" class="band oh-band" role="tabpanel" tabindex="0">
+
+        <!-- Page title row -->
+        <div class="oh-topbar">
+          <div>
+            <h2 class="oh-title">Order History</h2>
+          </div>
+          <button class="oh-new-btn" id="ohToggleForm">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New Order
+          </button>
+        </div>
+
+        <!-- Collapsible create-order form -->
+        <div class="oh-form-wrap" id="ohFormWrap" hidden>
+          <div class="oh-form-card">
+            <h3 class="oh-form-title">Create an Order</h3>
+            <form id="orderForm" class="form-grid">
+              <div class="field"><label>Customer Name</label><input name="customer" placeholder="e.g. ABC Contractors" required></div>
+              <div class="field"><label>Product</label><input name="product" placeholder="e.g. Steel Doors" required></div>
+              <div class="field"><label>Quantity</label><input name="quantity" type="number" min="1" placeholder="1" required></div>
+              <button type="submit" class="full submit-btn submit-btn--green">Create Order</button>
+            </form>
+            <p id="orderFormStatus" class="form-status" style="margin-top:10px"></p>
+          </div>
+        </div>
+
+        <!-- Main card -->
+        <div class="oh-card">
+
+          <!-- Tab bar + date range -->
+          <div class="oh-filters">
+            <div class="oh-tabs" role="tablist" id="ohTabList">
+              <button class="oh-tab active" data-filter="all"    role="tab">All Orders</button>
+              <button class="oh-tab"        data-filter="summary" role="tab">Summary</button>
+              <button class="oh-tab"        data-filter="DELIVERED" role="tab">Completed</button>
+              <button class="oh-tab"        data-filter="CANCELLED" role="tab">Cancelled</button>
+            </div>
+            <div class="oh-date-range">
+              <div class="oh-date-pill">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <input type="date" id="ohDateFrom" aria-label="From date">
+              </div>
+              <span class="oh-date-to">To</span>
+              <div class="oh-date-pill">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <input type="date" id="ohDateTo" aria-label="To date">
+              </div>
+            </div>
+          </div>
+
+          <!-- Summary row (visible only on Summary tab) -->
+          <div class="oh-summary-row" id="ohSummaryRow" hidden>
+            <div class="oh-sum-card oh-sum-card--blue">
+              <span class="oh-sum-label">Total Orders</span>
+              <strong class="oh-sum-value" id="ohSumTotal">0</strong>
+            </div>
+            <div class="oh-sum-card oh-sum-card--green">
+              <span class="oh-sum-label">Delivered</span>
+              <strong class="oh-sum-value" id="ohSumDelivered">0</strong>
+            </div>
+            <div class="oh-sum-card oh-sum-card--red">
+              <span class="oh-sum-label">Cancelled</span>
+              <strong class="oh-sum-value" id="ohSumCancelled">0</strong>
+            </div>
+            <div class="oh-sum-card oh-sum-card--amber">
+              <span class="oh-sum-label">Pending</span>
+              <strong class="oh-sum-value" id="ohSumPending">0</strong>
+            </div>
+            <div class="oh-sum-card oh-sum-card--purple">
+              <span class="oh-sum-label">Total Value</span>
+              <strong class="oh-sum-value" id="ohSumValue">KSh 0</strong>
+            </div>
+          </div>
+
+          <!-- Table -->
+          <div class="oh-table-wrap" id="ohTableWrap">
+            <table class="oh-table">
+              <thead>
+                <tr>
+                  <th class="oh-th-sno">S No <span class="oh-sort-icon">⇅</span></th>
+                  <th>Order ID <span class="oh-sort-icon">⇅</span></th>
+                  <th>Order Name <span class="oh-sort-icon">⇅</span></th>
+                  <th>Amount (KSh) <span class="oh-sort-icon">⇅</span></th>
+                  <th>Quantity <span class="oh-sort-icon">⇅</span></th>
+                  <th>Status <span class="oh-sort-icon">⇅</span></th>
+                </tr>
+              </thead>
+              <tbody id="ohTableBody"></tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <div class="oh-pagination" id="ohPagination"></div>
+
+        </div>
+      </section>
+
+      <!-- ===== BIASHARA GPT ===== -->
+      <section id="gpt" class="band" role="tabpanel" tabindex="0">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">AI Assistant</p>
+            <h2>Biashara GPT</h2>
+          </div>
+          <span class="tag">Natural language · Swahili · English</span>
+        </div>
+        <div class="assistant">
+          <div class="chat">
+            <div id="aiMeta" class="ai-meta"></div>
+            <div id="chatLog" class="chat-log"></div>
+            <form id="aiForm">
+              <select id="aiLanguage" aria-label="AI response language">
+                <option value="English">English</option>
+                <option value="Swahili">Kiswahili</option>
+              </select>
+              <input id="aiInput" autocomplete="off" placeholder="Record a sale, purchase, production, or ask about your business…" aria-label="Biashara GPT message">
+              <button class="send-btn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
+            </form>
+          </div>
+          <section class="panel ai-side-panel">
+            <h3>Recent AI Actions</h3>
+            <button id="testOpenRouter" class="secondary full-w">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:-1px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Test AI provider
+            </button>
+            <div id="aiActions" class="timeline" style="margin-top:14px"></div>
+          </section>
+        </div>
+      </section>
+
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
