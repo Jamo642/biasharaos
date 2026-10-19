@@ -172,6 +172,30 @@ function migrate() {
       id TEXT PRIMARY KEY, company_id TEXT NOT NULL, actor_user_id TEXT, action TEXT NOT NULL,
       entity_type TEXT, entity_id TEXT, before_json TEXT, after_json TEXT, source TEXT NOT NULL, created_at TEXT NOT NULL
     );
+    -- Jua Kali extensions ----------------------------------------------------
+    -- A chama is the pooled savings group every Jua Kali cluster has. Members
+    -- deposit, borrow and repay against the group balance.
+    CREATE TABLE IF NOT EXISTS chama_members (
+      id TEXT PRIMARY KEY, company_id TEXT NOT NULL, name TEXT NOT NULL, phone TEXT,
+      role TEXT NOT NULL DEFAULT 'MEMBER' CHECK(role IN ('MEMBER','MWENYEKITI','KATIBU','MWEKA_HAZINA')),
+      joined_at TEXT NOT NULL, FOREIGN KEY(company_id) REFERENCES companies(id)
+    );
+    -- Every deposit/withdraw/loan/repay in the chama ledger. Balance = SUM(
+    -- kind IN (DEPOSIT,REPAY)) - SUM(kind IN (WITHDRAW,LOAN)).
+    CREATE TABLE IF NOT EXISTS chama_contributions (
+      id TEXT PRIMARY KEY, company_id TEXT NOT NULL, member_id TEXT NOT NULL, amount REAL NOT NULL,
+      kind TEXT NOT NULL CHECK(kind IN ('DEPOSIT','WITHDRAW','LOAN','REPAY')),
+      note TEXT, source TEXT NOT NULL, user_id TEXT, created_at TEXT NOT NULL,
+      FOREIGN KEY(company_id) REFERENCES companies(id), FOREIGN KEY(member_id) REFERENCES chama_members(id)
+    );
+    -- Piecework: pay per job done. Each row is a tally the group settles
+    -- weekly. amount = units * rate at log time (locked).
+    CREATE TABLE IF NOT EXISTS piecework_entries (
+      id TEXT PRIMARY KEY, company_id TEXT NOT NULL, worker_name TEXT NOT NULL, user_id TEXT,
+      job TEXT NOT NULL, units REAL NOT NULL, rate REAL NOT NULL, amount REAL NOT NULL,
+      paid INTEGER NOT NULL DEFAULT 0, paid_at TEXT, source TEXT NOT NULL, created_at TEXT NOT NULL,
+      FOREIGN KEY(company_id) REFERENCES companies(id)
+    );
   `);
   // Schema migrations for existing databases
   addColumnIfMissing("sales_transactions", "customer_id", "TEXT");
@@ -669,6 +693,252 @@ function getProfitAndLoss(period = "week") {
     profitMargin: Number(profitMargin),
     expenseByCategory
   };
+}
+
+// ========== JUA KALI EXTENSIONS ==========
+// Chama (group savings), piecework (per-job pay), AI pricing suggester,
+// daily cashbook, proactive AI (daily summary / dormant customers / price drift).
+
+function findChamaMember(nameOrId) {
+  const s = String(nameOrId || "").trim();
+  if (!s) return null;
+  // Exact id match first, then case-insensitive name LIKE.
+  const byId = get("SELECT * FROM chama_members WHERE id=:id", { id: s });
+  if (byId) return byId;
+  return get("SELECT * FROM chama_members WHERE lower(name) LIKE :pat LIMIT 1", { pat: `%${s.toLowerCase()}%` });
+}
+
+function listChamaMembers() {
+  const cid = companyId();
+  if (!cid) return { error: "Set up the workspace first." };
+  const members = all(`
+    SELECT m.id, m.name, m.phone, m.role, m.joined_at,
+      COALESCE((SELECT SUM(CASE WHEN kind IN ('DEPOSIT','REPAY') THEN amount ELSE -amount END)
+                FROM chama_contributions WHERE member_id=m.id), 0) AS balance
+    FROM chama_members m WHERE m.company_id=:cid ORDER BY m.joined_at ASC`, { cid });
+  const pool = members.reduce((sum, m) => sum + Number(m.balance || 0), 0);
+  return { members, pool_balance: pool, member_count: members.length };
+}
+
+function addChamaMember({ name, phone, role, source = "WEB", userId = null }) {
+  const cid = companyId();
+  if (!cid) throw new Error("Set up the workspace first.");
+  const cleanName = _requireString(name, "name");
+  const existing = get("SELECT * FROM chama_members WHERE company_id=:cid AND lower(name)=lower(:name)", { cid, name: cleanName });
+  if (existing) return { memberId: existing.id, name: existing.name, duplicate: true };
+  const mid = id("chm");
+  const roleVal = ["MEMBER","MWENYEKITI","KATIBU","MWEKA_HAZINA"].includes(String(role || "").toUpperCase()) ? String(role).toUpperCase() : "MEMBER";
+  run("INSERT INTO chama_members VALUES (:id,:cid,:name,:phone,:role,:joined_at)", { id: mid, cid, name: cleanName, phone: phone || null, role: roleVal, joined_at: now() });
+  audit({ actorUserId: userId, action: "addChamaMember", entityType: "chama_member", entityId: mid, after: { name: cleanName, role: roleVal }, source });
+  return { memberId: mid, name: cleanName, role: roleVal };
+}
+
+function logChamaContribution({ member, amount, kind = "DEPOSIT", note, source = "WEB", userId = null }) {
+  const cid = companyId();
+  if (!cid) throw new Error("Set up the workspace first.");
+  const amt = _requirePositive(amount, "amount");
+  const kindVal = ["DEPOSIT","WITHDRAW","LOAN","REPAY"].includes(String(kind || "").toUpperCase()) ? String(kind).toUpperCase() : "DEPOSIT";
+  const found = findChamaMember(member);
+  if (!found) throw new Error(`Chama member "${member}" not found. Add them first with add_chama_member.`);
+  const cid2 = id("cco");
+  run("INSERT INTO chama_contributions VALUES (:id,:cid,:member_id,:amount,:kind,:note,:source,:user_id,:created_at)",
+    { id: cid2, cid, member_id: found.id, amount: amt, kind: kindVal, note: note || null, source, user_id: userId, created_at: now() });
+  const balance = getChamaBalance(found.id);
+  audit({ actorUserId: userId, action: "logChamaContribution", entityType: "chama_contribution", entityId: cid2, after: { member: found.name, amount: amt, kind: kindVal }, source });
+  return { contributionId: cid2, member: found.name, amount: amt, kind: kindVal, memberBalance: balance.balance };
+}
+
+function getChamaBalance(member) {
+  const cid = companyId();
+  if (!cid) return { error: "Set up the workspace first." };
+  if (!member) {
+    // whole-chama pool
+    const r = get(`SELECT COALESCE(SUM(CASE WHEN kind IN ('DEPOSIT','REPAY') THEN amount ELSE -amount END), 0) AS balance
+                   FROM chama_contributions WHERE company_id=:cid`, { cid });
+    return { scope: "pool", balance: Number(r.balance) };
+  }
+  const found = findChamaMember(member);
+  if (!found) return { error: `Chama member "${member}" not found.` };
+  const r = get(`SELECT COALESCE(SUM(CASE WHEN kind IN ('DEPOSIT','REPAY') THEN amount ELSE -amount END), 0) AS balance
+                 FROM chama_contributions WHERE company_id=:cid AND member_id=:mid`, { cid, mid: found.id });
+  const recent = all("SELECT amount, kind, note, created_at FROM chama_contributions WHERE member_id=:mid ORDER BY created_at DESC LIMIT 5", { mid: found.id });
+  return { scope: "member", memberId: found.id, member: found.name, balance: Number(r.balance), recent };
+}
+
+function recordPiecework({ worker, job, units, rate, source = "WEB", userId = null }) {
+  const cid = companyId();
+  if (!cid) throw new Error("Set up the workspace first.");
+  const workerName = _requireString(worker, "worker");
+  const jobLabel = _requireString(job, "job");
+  const u = _requirePositive(units, "units");
+  const r = _requirePositive(rate, "rate");
+  const amt = u * r;
+  const pid = id("pwk");
+  run("INSERT INTO piecework_entries VALUES (:id,:cid,:worker,:user_id,:job,:units,:rate,:amount,0,NULL,:source,:created_at)",
+    { id: pid, cid, worker: workerName, user_id: userId, job: jobLabel, units: u, rate: r, amount: amt, source, created_at: now() });
+  audit({ actorUserId: userId, action: "recordPiecework", entityType: "piecework", entityId: pid, after: { worker: workerName, job: jobLabel, amount: amt }, source });
+  return { pieceworkId: pid, worker: workerName, job: jobLabel, units: u, rate: r, amount: amt };
+}
+
+function getPendingPiecework(worker) {
+  const cid = companyId();
+  if (!cid) return { error: "Set up the workspace first." };
+  const params = { cid };
+  let where = "company_id=:cid AND paid=0";
+  if (worker) { where += " AND lower(worker_name) LIKE :pat"; params.pat = `%${String(worker).toLowerCase()}%`; }
+  const rows = all(`SELECT id, worker_name, job, units, rate, amount, created_at FROM piecework_entries WHERE ${where} ORDER BY created_at DESC LIMIT 100`, params);
+  const totalByWorker = {};
+  for (const r of rows) totalByWorker[r.worker_name] = (totalByWorker[r.worker_name] || 0) + Number(r.amount);
+  return { entries: rows, totals_by_worker: totalByWorker, total_pending: rows.reduce((s, r) => s + Number(r.amount), 0) };
+}
+
+function markPieceworkPaid(pieceworkId, userId = null, source = "WEB") {
+  const cid = companyId();
+  if (!cid) throw new Error("Set up the workspace first.");
+  const row = get("SELECT * FROM piecework_entries WHERE id=:id AND company_id=:cid", { id: pieceworkId, cid });
+  if (!row) throw new Error("Piecework entry not found.");
+  if (row.paid) return { pieceworkId, alreadyPaid: true };
+  run("UPDATE piecework_entries SET paid=1, paid_at=:paid_at WHERE id=:id", { id: pieceworkId, paid_at: now() });
+  // Also log as an expense so cashbook reflects reality.
+  run("INSERT INTO expenses VALUES (:id,:cid,'WAGES',:desc,:amount,:user_id,:source,:created_at)",
+    { id: id("exp"), cid, desc: `Piecework: ${row.worker_name} - ${row.job}`, amount: row.amount, user_id: userId, source, created_at: now() });
+  audit({ actorUserId: userId, action: "markPieceworkPaid", entityType: "piecework", entityId: pieceworkId, after: { paid: true, amount: row.amount }, source });
+  return { pieceworkId, worker: row.worker_name, amount: Number(row.amount), paid: true };
+}
+
+// Suggest a sale price. If a product name is given and past sales exist, we
+// weight toward the recent median. Otherwise we fall back to a markup over the
+// supplied material_cost + time cost. markup_pct defaults to 35% (typical Jua
+// Kali margin for welded/fabricated goods).
+function suggestPrice({ product, material_cost, time_hours, hourly_rate, markup_pct }) {
+  const cid = companyId();
+  if (!cid) return { error: "Set up the workspace first." };
+  const prodName = String(product || "").trim();
+  const past = prodName
+    ? all("SELECT amount, quantity FROM sales_transactions WHERE company_id=:cid AND lower(item_name) LIKE :pat ORDER BY created_at DESC LIMIT 20",
+          { cid, pat: `%${prodName.toLowerCase()}%` })
+    : [];
+  const unitPrices = past.map(p => Number(p.amount) / Math.max(1, Number(p.quantity))).filter(n => Number.isFinite(n) && n > 0).sort((a, b) => a - b);
+  const median = unitPrices.length ? unitPrices[Math.floor(unitPrices.length / 2)] : null;
+  const matCost = Math.max(0, Number(material_cost) || 0);
+  const hours = Math.max(0, Number(time_hours) || 0);
+  const rate = Math.max(0, Number(hourly_rate) || 500); // KSh 500/hr default fundi rate
+  const markup = Math.max(0, Number(markup_pct) || 35);
+  const costBasis = matCost + hours * rate;
+  const costPlus = costBasis > 0 ? Math.round(costBasis * (1 + markup / 100)) : null;
+  // Final suggestion: prefer the greater of median and cost-plus so we don't
+  // underprice when materials get expensive.
+  const candidates = [median, costPlus].filter(x => Number.isFinite(x) && x > 0);
+  const suggested = candidates.length ? Math.round(Math.max(...candidates)) : null;
+  return {
+    product: prodName || "(unspecified)",
+    past_sales_count: past.length,
+    median_unit_price: median ? Math.round(median) : null,
+    cost_basis: costBasis || null,
+    cost_plus_price: costPlus,
+    markup_pct_used: markup,
+    hourly_rate_used: rate,
+    suggested_price: suggested,
+    confidence: past.length >= 5 ? "high" : past.length >= 2 ? "medium" : "low",
+    note: !suggested ? "Need past sales OR material_cost+time_hours to suggest a price." : null
+  };
+}
+
+// Daily cashbook: today's money in (sales + customer_payments) vs money out
+// (expenses + purchases + supplier_payments). Pass date as 'YYYY-MM-DD' or
+// omit for today. Returns the one-view "hesabu ya siku" summary.
+function getDailyCashbook(date) {
+  const cid = companyId();
+  if (!cid) return { error: "Set up the workspace first." };
+  const d = (date && /^\d{4}-\d{2}-\d{2}$/.test(String(date))) ? String(date) : new Date().toISOString().slice(0, 10);
+  const salesIn = get("SELECT COALESCE(SUM(amount),0) AS total, COUNT(*) AS n FROM sales_transactions WHERE company_id=:cid AND date(created_at)=:d", { cid, d });
+  const custPayIn = get("SELECT COALESCE(SUM(amount),0) AS total, COUNT(*) AS n FROM debt_payments WHERE company_id=:cid AND debt_type='CUSTOMER' AND date(created_at)=:d", { cid, d });
+  const expensesOut = get("SELECT COALESCE(SUM(amount),0) AS total, COUNT(*) AS n FROM expenses WHERE company_id=:cid AND date(created_at)=:d", { cid, d });
+  const purchasesOut = get("SELECT COALESCE(SUM(total_cost),0) AS total, COUNT(*) AS n FROM purchases WHERE company_id=:cid AND date(created_at)=:d", { cid, d });
+  const supPayOut = get("SELECT COALESCE(SUM(amount),0) AS total, COUNT(*) AS n FROM debt_payments WHERE company_id=:cid AND debt_type='SUPPLIER' AND date(created_at)=:d", { cid, d });
+  const inflow = Number(salesIn.total) + Number(custPayIn.total);
+  const outflow = Number(expensesOut.total) + Number(purchasesOut.total) + Number(supPayOut.total);
+  return {
+    date: d,
+    inflow,
+    outflow,
+    net: inflow - outflow,
+    breakdown: {
+      sales: { total: Number(salesIn.total), count: salesIn.n },
+      customer_payments: { total: Number(custPayIn.total), count: custPayIn.n },
+      expenses: { total: Number(expensesOut.total), count: expensesOut.n },
+      purchases: { total: Number(purchasesOut.total), count: purchasesOut.n },
+      supplier_payments: { total: Number(supPayOut.total), count: supPayOut.n }
+    }
+  };
+}
+
+// Compose the end-of-day summary SMS text (Swahili + KSh). Short, feature-
+// phone friendly: title, net, top three activities.
+function generateDailySummary(language = "Swahili") {
+  const cb = getDailyCashbook();
+  if (cb.error) return { error: cb.error };
+  const low = all(`SELECT item_name, quantity, reorder_level, unit FROM inventory
+                   WHERE company_id=:cid AND reorder_level > 0 AND quantity <= reorder_level LIMIT 5`, { cid: companyId() });
+  const fmt = n => "KSh " + Math.round(Number(n || 0)).toLocaleString();
+  const sw = language === "Swahili";
+  const label = sw ? "Hesabu ya leo" : "Today's cashbook";
+  const parts = [
+    `${label} (${cb.date})`,
+    `${sw ? "Mapato" : "Inflow"}: ${fmt(cb.inflow)} · ${sw ? "Matumizi" : "Outflow"}: ${fmt(cb.outflow)}`,
+    `${sw ? "Faida ya leo" : "Net"}: ${fmt(cb.net)}`,
+    `${sw ? "Mauzo" : "Sales"}: ${cb.breakdown.sales.count} (${fmt(cb.breakdown.sales.total)})`
+  ];
+  if (low.length) {
+    const items = low.map(i => `${i.item_name} ${i.quantity}${i.unit}`).join(", ");
+    parts.push((sw ? "Stock chini: " : "Low stock: ") + items);
+  }
+  const text = parts.join("\n");
+  return { date: cb.date, inflow: cb.inflow, outflow: cb.outflow, net: cb.net, low_stock: low, text };
+}
+
+// Dormant customers: those with no sale in the last N days (default 21). Jua
+// Kali margin loss is often from forgotten regulars.
+function getDormantCustomers(days = 21) {
+  const cid = companyId();
+  if (!cid) return { error: "Set up the workspace first." };
+  const cutoff = Number(days) > 0 ? Number(days) : 21;
+  const rows = all(`
+    SELECT c.id, c.name, c.phone,
+      (SELECT MAX(created_at) FROM sales_transactions s WHERE s.customer_id=c.id) AS last_sale,
+      (SELECT COUNT(*) FROM sales_transactions s WHERE s.customer_id=c.id) AS total_sales
+    FROM customers c WHERE c.company_id=:cid
+    ORDER BY last_sale ASC NULLS LAST`, { cid });
+  const nowMs = Date.now();
+  const dormant = rows.filter(r => r.last_sale && (nowMs - new Date(r.last_sale).getTime()) >= cutoff * 86_400_000 && r.total_sales > 0);
+  return { days: cutoff, count: dormant.length, customers: dormant.slice(0, 20) };
+}
+
+// Pricing anomalies: compare last 7 days' avg material cost vs the previous 7.
+// If a material is up >= 15% we surface it (so the fundi can adjust bei ya kazi).
+function getPricingAnomalies() {
+  const cid = companyId();
+  if (!cid) return { error: "Set up the workspace first." };
+  const rows = all(`
+    SELECT item_name,
+      AVG(CASE WHEN created_at >= datetime('now','-7 days') THEN total_cost/NULLIF(quantity,0) END) AS recent_cost,
+      AVG(CASE WHEN created_at <  datetime('now','-7 days') AND created_at >= datetime('now','-14 days') THEN total_cost/NULLIF(quantity,0) END) AS prior_cost
+    FROM purchases WHERE company_id=:cid GROUP BY item_name`, { cid });
+  const anomalies = [];
+  for (const r of rows) {
+    if (!r.recent_cost || !r.prior_cost) continue;
+    const delta = (r.recent_cost - r.prior_cost) / r.prior_cost;
+    if (Math.abs(delta) >= 0.15) {
+      anomalies.push({
+        material: r.item_name,
+        recent_unit_cost: Math.round(r.recent_cost),
+        prior_unit_cost: Math.round(r.prior_cost),
+        change_pct: Math.round(delta * 100)
+      });
+    }
+  }
+  anomalies.sort((a, b) => Math.abs(b.change_pct) - Math.abs(a.change_pct));
+  return { count: anomalies.length, anomalies };
 }
 
 // ========== ALERT GENERATION ==========
@@ -1608,7 +1878,16 @@ const AGENT_TOOLS = [
   { type: "function", function: { name: "get_business_summary", description: "Return the real weekly business summary: revenue, expenses, profit, production.", parameters: { type: "object", properties: {}, required: [] } } },
   { type: "function", function: { name: "get_profit_loss", description: "Return profit and loss for a given period. Use for questions about profit, revenue, expenses. Swahili: faida.", parameters: { type: "object", properties: { period: { type: "string", enum: ["today", "week", "month"] } }, required: ["period"] } } },
   { type: "function", function: { name: "get_customer_debts", description: "Return all outstanding customer receivables — money owed to the business. Swahili: nani ananidai.", parameters: { type: "object", properties: {}, required: [] } } },
-  { type: "function", function: { name: "get_supplier_debts", description: "Return all outstanding supplier payables — money the business owes. Swahili: nina madeni kiasi gani.", parameters: { type: "object", properties: {}, required: [] } } }
+  { type: "function", function: { name: "get_supplier_debts", description: "Return all outstanding supplier payables — money the business owes. Swahili: nina madeni kiasi gani.", parameters: { type: "object", properties: {}, required: [] } } },
+  // ── Jua Kali extension tools ────────────────────────────────────────────
+  { type: "function", function: { name: "suggest_price", description: "Suggest a sale price for a product using past sales + optional material cost + time estimate. Swahili: bei gani / nipange bei. Use when the fundi asks what to charge.", parameters: { type: "object", properties: { product: { type: "string", description: "Product or job name (e.g. 'steel gate', 'mlango wa chuma')" }, material_cost: { type: "number", description: "Optional: total material cost in KSh for this unit" }, time_hours: { type: "number", description: "Optional: labour hours expected" }, hourly_rate: { type: "number", description: "Optional: KSh per hour (default 500)" }, markup_pct: { type: "number", description: "Optional: markup percent (default 35)" } }, required: ["product"] } } },
+  { type: "function", function: { name: "get_daily_cashbook", description: "Return the day's money-in / money-out summary (hesabu ya siku). Omit date for today, or pass YYYY-MM-DD.", parameters: { type: "object", properties: { date: { type: "string", description: "Optional YYYY-MM-DD; defaults to today" } }, required: [] } } },
+  { type: "function", function: { name: "add_chama_member", description: "Register a new member in the chama (group savings). Swahili: ongeza mwanachama.", parameters: { type: "object", properties: { name: { type: "string" }, phone: { type: "string" }, role: { type: "string", enum: ["MEMBER","MWENYEKITI","KATIBU","MWEKA_HAZINA"], description: "Default MEMBER" } }, required: ["name"] } } },
+  { type: "function", function: { name: "log_chama_contribution", description: "Log a chama deposit, withdrawal, loan, or repayment. Swahili: nimechanga / nimekopa / nimerudisha.", parameters: { type: "object", properties: { member: { type: "string", description: "Member name" }, amount: { type: "number" }, kind: { type: "string", enum: ["DEPOSIT","WITHDRAW","LOAN","REPAY"], description: "DEPOSIT (nimechanga), WITHDRAW, LOAN (nimekopa), REPAY (nimerudisha)" }, note: { type: "string" } }, required: ["member", "amount", "kind"] } } },
+  { type: "function", function: { name: "get_chama_balance", description: "Chama balance. Omit member to get the whole pool, pass a member name for their individual balance.", parameters: { type: "object", properties: { member: { type: "string" } }, required: [] } } },
+  { type: "function", function: { name: "list_chama_members", description: "List all chama members with their current individual balances and the pool total.", parameters: { type: "object", properties: {}, required: [] } } },
+  { type: "function", function: { name: "record_piecework", description: "Log a piecework job done by a worker (units × rate = amount). Settled weekly. Swahili: kazi ya X vipande.", parameters: { type: "object", properties: { worker: { type: "string" }, job: { type: "string", description: "Short job label e.g. 'weld hinges' / 'mlango'" }, units: { type: "number", description: "Number of units done" }, rate: { type: "number", description: "KSh per unit" } }, required: ["worker", "job", "units", "rate"] } } },
+  { type: "function", function: { name: "get_pending_piecework", description: "Return unpaid piecework totals. Pass a worker name to filter, omit for everyone.", parameters: { type: "object", properties: { worker: { type: "string" } }, required: [] } } }
 ];
 
 async function callToolModel(provider, messages, timeoutMs = 20_000) {
@@ -1618,69 +1897,267 @@ async function callToolModel(provider, messages, timeoutMs = 20_000) {
   const headers = { Authorization: `Bearer ${isNvidia ? process.env.NVIDIA_API_KEY || process.env.AI_API_KEY : process.env.OPENROUTER_API_KEY}`, "Content-Type": "application/json" };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  const res = await fetch(endpoint, { method: "POST", signal: controller.signal, headers, body: JSON.stringify({ model, temperature: 0.1, max_tokens: 500, messages, tools: AGENT_TOOLS, tool_choice: "auto" }) });
+  const res = await fetch(endpoint, { method: "POST", signal: controller.signal, headers, body: JSON.stringify({ model, temperature: 0.1, max_tokens: 1200, messages, tools: AGENT_TOOLS, tool_choice: "auto" }) });
   clearTimeout(timer);
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(payload?.error?.message || `AI tool request failed (${res.status})`);
   return { message: payload.choices?.[0]?.message, model: payload.model || model, provider };
 }
 
+// Build a rich, Jua Kali-aware system prompt that primes the model with today's
+// date, currency, business identity, known names (so it uses existing records
+// instead of inventing new spellings), and Swahili verb conventions.
+function buildAgentSystemPrompt(language) {
+  const company = get("SELECT name, city FROM companies LIMIT 1") || {};
+  const today = new Date();
+  const dateStr = today.toISOString().slice(0, 10);
+  const dowSw = ["Jumapili","Jumatatu","Jumanne","Jumatano","Alhamisi","Ijumaa","Jumamosi"][today.getDay()];
+  const safe = (rows, key) => rows.map(r => r[key]).filter(Boolean).join(", ") || "(none yet)";
+  const customers = safe(all("SELECT name FROM customers ORDER BY created_at DESC LIMIT 20"), "name");
+  const suppliers = safe(all("SELECT name FROM suppliers ORDER BY created_at DESC LIMIT 20"), "name");
+  const materials = safe(all("SELECT item_name FROM inventory WHERE item_type='RAW_MATERIAL' ORDER BY item_name LIMIT 30"), "item_name");
+  const products  = safe(all("SELECT name FROM products ORDER BY created_at DESC LIMIT 20"), "name");
+  return `You are Biashara GPT — the voice inside a Kenyan Jua Kali / SME business OS called ${company.name || "Biashara OS"}${company.city ? " in " + company.city : ""}.
+Today is ${dateStr} (${dowSw}). Currency: Kenyan Shilling (KSh / Ksh / shillings / bob).
+Reply in ${language}. If the user wrote in Kiswahili, Sheng, or mixed English/Swahili, mirror their language and keep it short and friendly — this is a fundi on a feature phone, not a corporate client.
+
+HARD RULES:
+- Use tools for every data read or write. Never claim an action happened without a successful tool result.
+- You may chain multiple tool calls across turns (e.g. check stock first, then record the sale).
+- Quantities and amounts must be positive numbers. If a user is ambiguous, ask ONE short clarifying question.
+- Keep answers under 400 chars unless listing many rows. No markdown headers in SMS/USSD contexts.
+- Prefer existing records: if a name the user mentions is close to one of the KNOWN RECORDS below, use that exact spelling.
+
+SWAHILI VERB CHEAT SHEET:
+- nimeuza = I sold → record_sale
+- nimenunua = I bought → record_purchase
+- nimelipa = I paid → record_expense (if bills/rent) or record_supplier_payment (if to a supplier)
+- alinilipa / amenilipa / amelipia = customer paid me → record_customer_payment
+- nimetengeneza / tumetengeneza = I/we produced → record_production
+- nina deni ya X = I owe X → get_supplier_debts
+- ananidai / anandai / mimi ni mdeni = I'm owed by them → get_customer_debts
+- bei gani? / nipange bei = pricing question → suggest_price
+
+KNOWN RECORDS (use these spellings; do not invent new names if a close match exists):
+- Customers: ${customers}
+- Suppliers: ${suppliers}
+- Materials: ${materials}
+- Products:  ${products}`;
+}
+
+// Validation helpers used by every tool handler. Throwing means we return
+// {error:...} to the model and let it correct itself in the next round.
+function _requirePositive(val, label) {
+  const n = Number(val);
+  if (!Number.isFinite(n) || n <= 0) throw new Error(`${label} must be a positive number`);
+  return n;
+}
+function _requireString(val, label) {
+  const s = String(val || "").trim();
+  if (!s) throw new Error(`${label} is required`);
+  return s;
+}
+
+// Dispatch a single tool call. Returns the backend result or {error:string}.
+async function runToolCall(call, ctx) {
+  const { message, channel, userId } = ctx;
+  let input;
+  try { input = JSON.parse(call.function.arguments || "{}"); } catch { return { error: "Invalid JSON in tool arguments" }; }
+  const name = call.function.name;
+  try {
+    if (name === "record_sale") {
+      const item = _requireString(input.item, "item");
+      const quantity = _requirePositive(input.quantity, "quantity");
+      const amount = _requirePositive(input.amount, "amount");
+      return withTransaction(() => createSale({ itemName: item, quantity, unit: input.unit || "units", amount, customer: input.customer, paymentStatus: input.payment_status || "PAID", source: channel, userId, originalMessage: message, structured: { intent: "sale", ...input } }));
+    }
+    if (name === "record_purchase") {
+      const item = _requireString(input.item, "item");
+      const quantity = _requirePositive(input.quantity, "quantity");
+      const totalCost = _requirePositive(input.total_cost, "total_cost");
+      return withTransaction(() => recordPurchase({ supplierName: input.supplier, itemName: item, quantity, unit: input.unit || "kg", totalCost, paymentStatus: input.payment_status || "PAID", source: channel, userId, originalMessage: message }));
+    }
+    if (name === "record_production") {
+      const product = _requireString(input.product, "product");
+      const quantityProduced = _requirePositive(input.quantity_produced, "quantity_produced");
+      return withTransaction(() => createProductionEntry({ productName: product, quantityProduced, materialName: input.material, quantityConsumed: Number(input.quantity_consumed) || 0, unit: input.unit || "kg", source: channel, userId, originalMessage: message, structured: { intent: "production_update", ...input } }));
+    }
+    if (name === "record_expense") {
+      const amount = _requirePositive(input.amount, "amount");
+      return withTransaction(() => recordExpense({ category: String(input.category || "OTHER").toUpperCase(), description: input.description, amount, userId, source: channel }));
+    }
+    if (name === "record_customer_payment") {
+      const customer = _requireString(input.customer, "customer");
+      const amount = _requirePositive(input.amount, "amount");
+      const cust = findCustomer(customer);
+      if (!cust) return { error: `Customer "${customer}" not found.` };
+      const debt = get("SELECT * FROM customer_debts WHERE customer_id=:cid AND status IN ('UNPAID','PARTIAL') ORDER BY created_at DESC LIMIT 1", { cid: cust.id });
+      if (!debt) return { error: `No outstanding debt for ${cust.name}.` };
+      const r = withTransaction(() => recordDebtPayment({ debtId: debt.id, amount, paymentMethod: input.method || "CASH", userId, source: channel }));
+      r.customerName = cust.name; return r;
+    }
+    if (name === "record_supplier_payment") {
+      const supplier = _requireString(input.supplier, "supplier");
+      const amount = _requirePositive(input.amount, "amount");
+      const sup = findSupplier(supplier);
+      if (!sup) return { error: `Supplier "${supplier}" not found.` };
+      const debt = get("SELECT * FROM supplier_debts WHERE supplier_id=:sid AND status IN ('UNPAID','PARTIAL') ORDER BY created_at DESC LIMIT 1", { sid: sup.id });
+      if (!debt) return { error: `No outstanding payable to ${sup.name}.` };
+      const r = withTransaction(() => recordSupplierPayment({ debtId: debt.id, amount, paymentMethod: input.method || "CASH", userId, source: channel }));
+      r.supplierName = sup.name; return r;
+    }
+    if (name === "configure_material") {
+      const material = _requireString(input.material, "material");
+      return withTransaction(() => configureRecord({ target: "material", name: material, quantity: Number(input.initial_stock) || 0, unit: input.unit || "kg", reorderLevel: Number(input.minimum_threshold) || 0, supplier: input.supplier, source: channel, userId, originalMessage: message, structured: { intent: "configure", target: "material", ...input } }));
+    }
+    if (name === "get_inventory_level") return findInventoryItem(input.material) || { error: `${input.material} is not configured in inventory.` };
+    if (name === "get_business_summary") return getBusinessSummary();
+    if (name === "get_profit_loss") return getProfitAndLoss(input.period || "week");
+    if (name === "get_customer_debts") return getCustomerDebts();
+    if (name === "get_supplier_debts") return getSupplierPayables();
+    // Jua Kali extension tools
+    if (name === "suggest_price") return suggestPrice(input);
+    if (name === "get_daily_cashbook") return getDailyCashbook(input.date);
+    if (name === "add_chama_member") return withTransaction(() => addChamaMember({ ...input, source: channel, userId }));
+    if (name === "log_chama_contribution") return withTransaction(() => logChamaContribution({ ...input, source: channel, userId }));
+    if (name === "get_chama_balance") return getChamaBalance(input.member);
+    if (name === "list_chama_members") return listChamaMembers();
+    if (name === "record_piecework") return withTransaction(() => recordPiecework({ ...input, source: channel, userId }));
+    if (name === "get_pending_piecework") return getPendingPiecework(input.worker);
+    return { error: "Unknown tool: " + name };
+  } catch (err) {
+    return { error: String(err?.message || err) };
+  }
+}
+
 async function runToolAgent(message, language, userId, channel, aiTimeoutMs = 20_000) {
   const providers = activeAiProvider() === "nvidia" ? ["nvidia", "openrouter"] : ["openrouter", "nvidia"];
-  const system = `You are Biashara GPT for a Kenyan manufacturing business. Use tools for every database action or factual business lookup. Never claim an action happened without a tool result. Reply in ${language}. You do not have database access; tools are the only way to read or change records.`;
+  const system = buildAgentSystemPrompt(language);
   for (const provider of providers) {
     if (provider === "nvidia" && !nvidiaConfigured()) continue;
     if (provider === "openrouter" && !openRouterConfigured()) continue;
     try {
       const messages = [{ role: "system", content: system }, { role: "user", content: String(message || "").slice(0, 4000) }];
-      let answer = await callToolModel(provider, messages, aiTimeoutMs);
-      const toolCalls = answer.message?.tool_calls || [];
-      if (!toolCalls.length) continue;
-      messages.push(answer.message);
       const applied = [];
-      for (const call of toolCalls) {
-        const input = JSON.parse(call.function.arguments || "{}");
-        let result;
-        if (call.function.name === "record_sale") result = withTransaction(() => createSale({ itemName: input.item, quantity: input.quantity, unit: input.unit || "units", amount: input.amount, customer: input.customer, paymentStatus: input.payment_status || "PAID", source: channel, userId, originalMessage: message, structured: { intent: "sale", ...input } }));
-        else if (call.function.name === "record_purchase") result = withTransaction(() => recordPurchase({ supplierName: input.supplier, itemName: input.item, quantity: input.quantity, unit: input.unit || "kg", totalCost: input.total_cost, paymentStatus: input.payment_status || "PAID", source: channel, userId, originalMessage: message }));
-        else if (call.function.name === "record_production") result = withTransaction(() => createProductionEntry({ productName: input.product, quantityProduced: input.quantity_produced, materialName: input.material, quantityConsumed: input.quantity_consumed || 0, unit: input.unit || "kg", source: channel, userId, originalMessage: message, structured: { intent: "production_update", ...input } }));
-        else if (call.function.name === "record_expense") result = withTransaction(() => recordExpense({ category: String(input.category || "OTHER").toUpperCase(), description: input.description, amount: input.amount, userId, source: channel }));
-        else if (call.function.name === "record_customer_payment") {
-          const cust = findCustomer(input.customer);
-          if (!cust) { result = { error: `Customer "${input.customer}" not found.` }; }
-          else {
-            const debt = get("SELECT * FROM customer_debts WHERE customer_id=:cid AND status IN ('UNPAID','PARTIAL') ORDER BY created_at DESC LIMIT 1", { cid: cust.id });
-            if (!debt) { result = { error: `No outstanding debt found for ${cust.name}.` }; }
-            else { result = withTransaction(() => recordDebtPayment({ debtId: debt.id, amount: Number(input.amount), paymentMethod: input.method || "CASH", userId, source: channel })); result.customerName = cust.name; }
-          }
+      let answer = await callToolModel(provider, messages, aiTimeoutMs);
+      // Multi-round tool loop: let the model chain lookups and writes until it
+      // produces a final text answer or we hit the safety cap.
+      for (let round = 0; round < 5; round++) {
+        const toolCalls = answer.message?.tool_calls || [];
+        if (!toolCalls.length) break;
+        messages.push(answer.message);
+        for (const call of toolCalls) {
+          const result = await runToolCall(call, { message, channel, userId });
+          applied.push({ name: call.function.name, result });
+          messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result).slice(0, 4000) });
         }
-        else if (call.function.name === "record_supplier_payment") {
-          const sup = findSupplier(input.supplier);
-          if (!sup) { result = { error: `Supplier "${input.supplier}" not found.` }; }
-          else {
-            const debt = get("SELECT * FROM supplier_debts WHERE supplier_id=:sid AND status IN ('UNPAID','PARTIAL') ORDER BY created_at DESC LIMIT 1", { sid: sup.id });
-            if (!debt) { result = { error: `No outstanding payable found for ${sup.name}.` }; }
-            else { result = withTransaction(() => recordSupplierPayment({ debtId: debt.id, amount: Number(input.amount), paymentMethod: input.method || "CASH", userId, source: channel })); result.supplierName = sup.name; }
-          }
-        }
-        else if (call.function.name === "configure_material") result = withTransaction(() => configureRecord({ target: "material", name: input.material, quantity: input.initial_stock, unit: input.unit, reorderLevel: input.minimum_threshold || 0, supplier: input.supplier, source: channel, userId, originalMessage: message, structured: { intent: "configure", target: "material", ...input } }));
-        else if (call.function.name === "get_inventory_level") result = findInventoryItem(input.material) || { error: `${input.material} is not configured in inventory.` };
-        else if (call.function.name === "get_business_summary") result = getBusinessSummary();
-        else if (call.function.name === "get_profit_loss") result = getProfitAndLoss(input.period || "week");
-        else if (call.function.name === "get_customer_debts") result = getCustomerDebts();
-        else if (call.function.name === "get_supplier_debts") result = getSupplierPayables();
-        else result = { error: "Unknown tool" };
-        applied.push({ name: call.function.name, result });
-        messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
+        answer = await callToolModel(provider, messages, aiTimeoutMs);
       }
-      answer = await callToolModel(provider, messages, aiTimeoutMs);
-      const text = answer.message?.content || applied.map((item) => JSON.stringify(item.result)).join(" ");
-      return { response: String(text), structured: { intent: applied[0].name, tool: applied[0].name }, result: applied[0].result, model: answer.model, provider: answer.provider, toolApplied: true };
+      const text = answer.message?.content || (applied.length ? applied.map(a => a.result?.error ? `${a.name}: ${a.result.error}` : `✓ ${a.name}`).join("; ") : "");
+      // If the provider produced nothing AND no tool was called, try the next one.
+      if (!text && !applied.length) continue;
+      return {
+        response: String(text || "(no response)"),
+        structured: applied.length ? { intent: applied[0].name, tool: applied[0].name, chain: applied.map(a => a.name) } : { intent: "answer" },
+        result: applied.length ? applied[applied.length - 1].result : null,
+        allApplied: applied,
+        model: answer.model,
+        provider: answer.provider,
+        toolApplied: applied.length > 0
+      };
     } catch (error) {
       console.error(`${provider} tool agent error:`, error.message);
     }
   }
   return null;
+}
+
+// Receipt / handwritten-note OCR. Accepts {image_base64, mime, note?} or
+// {image_url, note?}. Uses an OpenRouter vision model to extract vendor,
+// items, totals, and a category guess. Returns a *draft* expense the caller
+// confirms via POST /api/expenses. We never auto-write from OCR — the fundi
+// confirms first.
+async function extractReceiptFromImage({ image_base64, image_url, mime = "image/jpeg", note = "" } = {}) {
+  if (!openRouterConfigured()) {
+    return { error: "Receipt OCR requires OPENROUTER_API_KEY. Set it in .env." };
+  }
+  if (!image_base64 && !image_url) {
+    return { error: "Provide image_base64 (string) or image_url (URL)." };
+  }
+  const url = image_base64 ? `data:${mime};base64,${image_base64.replace(/^data:[^,]+,/, "")}` : image_url;
+  // Use a vision-capable model. Fallback chain keeps us working if one goes
+  // down. openRouterModels() returns the configured list; filter to known
+  // vision names, otherwise pick a sane default.
+  const visionModels = [
+    "meta-llama/llama-3.2-11b-vision-instruct:free",
+    "qwen/qwen-2-vl-7b-instruct:free",
+    "google/gemini-flash-1.5-8b"
+  ];
+  const prompt = `You are a receipt reader for a Kenyan Jua Kali / SME expense system. Look at the image and extract the fields as STRICT JSON. No markdown, no prose, just one JSON object:
+{
+  "vendor": "<shop or supplier name on the receipt, or empty>",
+  "date_hint": "<date as YYYY-MM-DD if visible, else empty>",
+  "currency": "<KSh or detected currency symbol>",
+  "items": [ { "name": "<item>", "quantity": <number>, "unit_price": <number>, "line_total": <number> } ],
+  "total_amount": <number: grand total in KSh>,
+  "category_guess": "<one of: MATERIALS, UTILITIES, TRANSPORT, WAGES, RENT, SUPPLIES, FOOD, OTHER>",
+  "confidence": "<low|medium|high>",
+  "note": "<brief interpretation; empty if nothing to add>"
+}
+If the image is unreadable, return {"error":"unreadable", "note":"..."}.
+Numbers must be plain numbers (no commas or units). ${note ? "User note: " + note : ""}`;
+
+  for (const model of visionModels) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 25_000);
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        signal: controller.signal,
+        headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          temperature: 0,
+          max_tokens: 900,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: "You are a precise receipt-reading OCR engine. Reply only with the JSON object requested." },
+            { role: "user", content: [
+              { type: "text", text: prompt },
+              { type: "image_url", image_url: { url } }
+            ] }
+          ]
+        })
+      });
+      clearTimeout(timer);
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) { console.error("Receipt OCR provider error:", model, payload?.error); continue; }
+      const raw = payload.choices?.[0]?.message?.content || "";
+      // Model may wrap JSON in prose despite instructions; extract the first {...}.
+      const match = String(raw).match(/\{[\s\S]*\}/);
+      if (!match) continue;
+      let parsed;
+      try { parsed = JSON.parse(match[0]); } catch { continue; }
+      if (parsed.error) return { error: parsed.error, note: parsed.note || "", model, provider: "openrouter" };
+      // Normalise and return a draft that pairs with POST /api/expenses.
+      const total = Number(parsed.total_amount) || (Array.isArray(parsed.items) ? parsed.items.reduce((s, i) => s + (Number(i.line_total) || Number(i.quantity || 0) * Number(i.unit_price || 0)), 0) : 0);
+      const draft_expense = {
+        category: String(parsed.category_guess || "OTHER").toUpperCase(),
+        description: [parsed.vendor, Array.isArray(parsed.items) ? parsed.items.map(i => i.name).filter(Boolean).join(", ") : null].filter(Boolean).join(" — "),
+        amount: Math.round(total * 100) / 100
+      };
+      return {
+        provider: "openrouter",
+        model,
+        extracted: parsed,
+        draft_expense,
+        next_step: "POST /api/expenses with draft_expense (edit first if anything is wrong)."
+      };
+    } catch (err) {
+      console.error("Receipt OCR attempt failed:", model, err.message);
+    }
+  }
+  return { error: "All vision models failed. Try again, or lower the image resolution." };
 }
 
 // The model interprets natural language, but it never writes to the database.
@@ -3153,6 +3630,67 @@ async function route(req, res) {
     if (DEMO_MODE && req.method === "POST" && url.pathname === "/api/demo/mpesa") {
       const invoice = get("SELECT id, amount FROM invoices WHERE status='UNPAID' ORDER BY issued_at DESC LIMIT 1");
       return json(res, 200, recordPayment({ invoiceId: invoice?.id, amount: invoice?.amount, reference: `SANDBOX-${Date.now()}`, rawPayload: data }));
+    }
+    // ========== JUA KALI: CASHBOOK ==========
+    if (req.method === "GET" && url.pathname === "/api/cashbook") {
+      return json(res, 200, getDailyCashbook(url.searchParams.get("date")));
+    }
+    // ========== JUA KALI: PRICING ==========
+    if (req.method === "POST" && url.pathname === "/api/pricing/suggest") {
+      return json(res, 200, suggestPrice(data || {}));
+    }
+    // ========== JUA KALI: CHAMA ==========
+    if (req.method === "GET" && url.pathname === "/api/chama/members") {
+      return json(res, 200, listChamaMembers());
+    }
+    if (req.method === "POST" && url.pathname === "/api/chama/members") {
+      return json(res, 201, withTransaction(() => addChamaMember({ name: data.name, phone: data.phone, role: data.role, source: "WEB" })));
+    }
+    if (req.method === "POST" && url.pathname === "/api/chama/contribute") {
+      return json(res, 201, withTransaction(() => logChamaContribution({ member: data.member, amount: Number(data.amount), kind: data.kind, note: data.note, source: "WEB" })));
+    }
+    if (req.method === "GET" && url.pathname === "/api/chama/balance") {
+      return json(res, 200, getChamaBalance(url.searchParams.get("member")));
+    }
+    // ========== JUA KALI: PIECEWORK ==========
+    if (req.method === "GET" && url.pathname === "/api/piecework") {
+      return json(res, 200, getPendingPiecework(url.searchParams.get("worker")));
+    }
+    if (req.method === "POST" && url.pathname === "/api/piecework") {
+      return json(res, 201, withTransaction(() => recordPiecework({ worker: data.worker, job: data.job, units: Number(data.units), rate: Number(data.rate), source: "WEB" })));
+    }
+    if (req.method === "POST" && url.pathname.startsWith("/api/piecework/") && url.pathname.endsWith("/pay")) {
+      const pid = url.pathname.split("/")[3];
+      return json(res, 200, withTransaction(() => markPieceworkPaid(pid, null, "WEB")));
+    }
+    // ========== PROACTIVE AI ==========
+    if (req.method === "GET" && url.pathname === "/api/ai/daily-summary") {
+      return json(res, 200, generateDailySummary(url.searchParams.get("language") || "Swahili"));
+    }
+    if (req.method === "POST" && url.pathname === "/api/ai/daily-summary/send") {
+      const summary = generateDailySummary(data.language || "Swahili");
+      if (summary.error) return json(res, 400, summary);
+      // Send to the business owner (and any phone list the caller supplies).
+      const owner = get("SELECT phone FROM users WHERE role='OWNER' LIMIT 1");
+      const recipients = Array.isArray(data.recipients) && data.recipients.length ? data.recipients : (owner ? [owner.phone] : []);
+      const sent = [];
+      for (const r of recipients) {
+        try { sendNotification({ channel: "SMS", recipient: r, message: summary.text, provider: "africastalking" }); sent.push(r); }
+        catch (e) { console.error("daily-summary send failed:", r, e.message); }
+      }
+      return json(res, 200, { ...summary, sent_to: sent });
+    }
+    if (req.method === "GET" && url.pathname === "/api/ai/alerts") {
+      return json(res, 200, {
+        dormant_customers: getDormantCustomers(Number(url.searchParams.get("days")) || 21),
+        pricing_anomalies: getPricingAnomalies(),
+        daily_cashbook: getDailyCashbook()
+      });
+    }
+    // ========== RECEIPT OCR ==========
+    if (req.method === "POST" && url.pathname === "/api/ai/receipt") {
+      const result = await extractReceiptFromImage(data);
+      return json(res, result?.error ? 400 : 200, result);
     }
     return json(res, 404, { error: "Not found" });
   } catch (err) {
