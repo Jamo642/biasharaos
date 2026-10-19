@@ -2,6 +2,23 @@
 
 Africa-first manufacturing ERP MVP for Kenyan SMEs, Jua Kali manufacturers, workshops, and small factories.
 
+## Layout
+
+```
+africa/
+├── backend/         Node server, schema, SQLite store
+│   ├── server.js
+│   ├── supabase-schema.sql
+│   └── data/biashara.sqlite
+├── frontend/        Static SPA (served by backend at /)
+│   ├── index.html
+│   ├── app.js
+│   └── styles.css
+├── package.json
+├── render.yaml
+└── .env             Secrets (git-ignored; see .env.example)
+```
+
 ## Run
 
 ```bash
@@ -10,7 +27,7 @@ npm start
 
 Open `http://localhost:3000`.
 
-The app stores the configured business workspace and all channel activity in `data/biashara.sqlite`. Demo seeding is disabled by default (`DEMO_MODE=false`); configure the workspace from the dashboard before recording live business data.
+The app stores the configured business workspace and all channel activity in `backend/data/biashara.sqlite`. Demo seeding is disabled by default (`DEMO_MODE=false`); configure the workspace from the dashboard before recording live business data.
 
 ## Sandbox integrations
 
@@ -65,6 +82,34 @@ The hackathon demo buttons use the same backend logic as the webhooks. If creden
 - Machines, downtime events, repair history, escalation
 - Biashara GPT structured action parser for English, Swahili, Sheng-style mixed input
 
+## Jua Kali extensions
+
+Built for how clusters actually run — group savings (chama), pay-per-job (piecework), one-view daily cashbook, AI pricing suggester, and proactive alerts.
+
+| Endpoint | What it does |
+| --- | --- |
+| `GET /api/cashbook?date=YYYY-MM-DD` | Day's hesabu ya siku: inflow (sales + customer payments) vs outflow (expenses + purchases + supplier payments), with breakdown. Omit date for today. |
+| `POST /api/pricing/suggest` | `{product, material_cost?, time_hours?, hourly_rate?, markup_pct?}` → suggested KSh price (median of past sales OR cost-plus, whichever is higher) + confidence. |
+| `GET /api/chama/members` | List chama members with per-member balances + pool total. |
+| `POST /api/chama/members` | `{name, phone?, role?}` — role one of `MEMBER` / `MWENYEKITI` / `KATIBU` / `MWEKA_HAZINA`. |
+| `POST /api/chama/contribute` | `{member, amount, kind, note?}` — kind one of `DEPOSIT` / `WITHDRAW` / `LOAN` / `REPAY`. |
+| `GET /api/chama/balance?member=…` | Member balance (omit `member` for whole-pool balance). |
+| `GET /api/piecework?worker=…` | Unpaid piecework entries + totals per worker. |
+| `POST /api/piecework` | `{worker, job, units, rate}` — amount = units × rate, locked at log time. |
+| `POST /api/piecework/{id}/pay` | Mark entry paid; also writes a `WAGES` expense so the cashbook reflects reality. |
+| `GET /api/ai/daily-summary?language=Swahili` | Returns `{inflow, outflow, net, low_stock, text}` where `text` is an SMS-shaped summary (`Hesabu ya leo …`). |
+| `POST /api/ai/daily-summary/send` | `{recipients?, language?}` — composes the same summary and SMS'es it (defaults to the owner's phone). |
+| `GET /api/ai/alerts?days=21` | Dormant customers + pricing anomalies (purchase-cost drift ≥15% week-over-week) + today's cashbook, in one call. |
+| `POST /api/ai/receipt` | `{image_base64, mime}` or `{image_url}` → vision OCR returns `draft_expense` the fundi confirms via `POST /api/expenses`. Requires `OPENROUTER_API_KEY`. |
+
+The AI tool-agent also exposes these as **callable tools** so Biashara GPT can chain them with sales/purchases/debts in one conversation:
+
+- `suggest_price`, `get_daily_cashbook`
+- `add_chama_member`, `log_chama_contribution`, `get_chama_balance`, `list_chama_members`
+- `record_piecework`, `get_pending_piecework`
+
+The agent now runs a **multi-step tool loop (up to 5 rounds)** with a system prompt pre-loaded with today's date, KSh, known customer/supplier/material names, and a Swahili verb cheat sheet (`nimeuza`, `nimenunua`, `nimelipa`, `alinilipa`, `nimetengeneza`, `ananidai`, `bei gani?`), so the model uses existing records instead of inventing new spellings and can chain reads + writes without a round-trip to the fundi.
+
 ## Production database
 
-`supabase-schema.sql` contains the PostgreSQL/Supabase schema with foreign keys, timestamps, audit tables, and RLS enabled.
+`backend/supabase-schema.sql` contains the PostgreSQL/Supabase schema with foreign keys, timestamps, audit tables, and RLS enabled.

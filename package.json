@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "description": "Biashara OS - Africa-first manufacturing ERP MVP",
-  "main": "server.js",
+  "main": "backend/server.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "start": "node backend/server.js",
+    "dev": "node --watch backend/server.js"
   },
   "engines": {
     "node": ">=24"

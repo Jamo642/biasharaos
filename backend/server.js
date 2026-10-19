@@ -4,9 +4,17 @@ const { join, extname } = require("node:path");
 const { randomUUID, createHmac, timingSafeEqual } = require("node:crypto");
 const { DatabaseSync } = require("node:sqlite");
 
+// Load .env. After the frontend/backend split, .env lives at the project
+// root (one level up from this file), but we also honour a backend/.env for
+// local overrides, and fall back to the old same-directory location so a
+// vanilla checkout keeps booting.
 function loadEnvFile() {
-  const envPath = join(__dirname, ".env");
-  if (!existsSync(envPath)) return;
+  const candidates = [
+    join(__dirname, "..", ".env"),
+    join(__dirname, ".env")
+  ];
+  const envPath = candidates.find(p => existsSync(p));
+  if (!envPath) return;
   for (const line of readFileSync(envPath, "utf8").split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) continue;
@@ -22,9 +30,10 @@ loadEnvFile();
 
 const PORT = Number(process.env.PORT || 3000);
 const USSD_RESPONSE_TIMEOUT_MS = Number(process.env.USSD_RESPONSE_TIMEOUT_MS || 8000);
-const ROOT = __dirname;
-const PUBLIC = join(ROOT, "public");
-const DATA_DIR = join(ROOT, "data");
+const ROOT = __dirname;                             // backend/
+const PROJECT_ROOT = join(ROOT, "..");              // repo root
+const PUBLIC = join(PROJECT_ROOT, "frontend");      // frontend/ served as static
+const DATA_DIR = join(ROOT, "data");                // backend/data/ (sqlite)
 const DB_PATH = join(DATA_DIR, "biashara.sqlite");
 const DEMO_MODE = process.env.DEMO_MODE === "true";
 
