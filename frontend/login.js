@@ -123,20 +123,23 @@ const codeForm = document.getElementById("code-form");
 const codeEmail = document.getElementById("code-email");
 const codeField = document.getElementById("code-field");
 const codeInput = document.getElementById("code");
-const codeInfo = document.getElementById("code-info");
-const codeSubmit = document.getElementById("code-submit");
 const codeRestart = document.getElementById("code-restart");
 const switchMode = document.getElementById("switch-mode");
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const AUTO_SEND_DELAY_MS = 1500;
 let codeSent = false;
+let busy = false;
+let sendTimer = null;
 
+// No buttons: the code is emailed once a complete address is typed (after a
+// short pause, on Enter, or on leaving the field), and sign-in happens as soon
+// as all 6 digits are entered.
 function showCodeStep(sent) {
   codeSent = sent;
   codeField.hidden = !sent;
   codeRestart.hidden = !sent;
   codeEmail.readOnly = sent;
-  codeInfo.hidden = !sent;
-  codeInfo.textContent = sent ? `We sent a code to ${codeEmail.value.trim()}. Check your spam folder if it is not in your inbox.` : "";
-  codeSubmit.textContent = sent ? "Sign in" : "Email me a code";
+  codeInput.placeholder = "";
   if (sent) codeInput.focus();
 }
 
@@ -144,7 +147,7 @@ function showPasswordForm(usePassword) {
   form.hidden = !usePassword;
   setHeading(usePassword && mode === "register" ? SETUP_TEXT : SIGN_IN_TEXT);
   codeForm.hidden = usePassword;
-  switchMode.textContent = usePassword ? "Email me a code instead" : "Use password instead";
+  switchMode.textContent = usePassword ? "Sign in with an email code instead" : "Use password instead";
   showError("");
 }
 
@@ -160,33 +163,59 @@ async function postJson(path, body) {
   return data;
 }
 
-codeForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  showError("");
+async function sendCode() {
+  clearTimeout(sendTimer);
   const email = codeEmail.value.trim();
-  if (!email) return showError("Enter your email address.");
-  const label = codeSubmit.textContent;
-  codeSubmit.disabled = true;
-  codeSubmit.textContent = codeSent ? "Signing in…" : "Sending…";
+  if (codeSent || busy || !EMAIL_PATTERN.test(email)) return;
+  busy = true;
+  showError("");
   try {
-    if (!codeSent) {
-      await postJson("/api/auth/email/request", { email });
-      showCodeStep(true);
-    } else {
-      await postJson("/api/auth/email/verify", { email, code: codeInput.value.trim() });
-      return window.location.replace("/");
-    }
+    await postJson("/api/auth/email/request", { email });
+    showCodeStep(true);
   } catch (err) {
     showError(err.message);
   }
-  codeSubmit.disabled = false;
-  if (codeSubmit.textContent.endsWith("…")) codeSubmit.textContent = label;
+  busy = false;
+}
+
+async function verifyCode() {
+  const code = codeInput.value.replace(/\D/g, "");
+  if (!codeSent || busy || code.length !== 6) return;
+  busy = true;
+  showError("");
+  codeInput.readOnly = true;
+  try {
+    await postJson("/api/auth/email/verify", { email: codeEmail.value.trim(), code });
+    return window.location.replace("/");
+  } catch (err) {
+    showError(err.message);
+    codeInput.value = "";
+    codeInput.focus();
+  }
+  codeInput.readOnly = false;
+  busy = false;
+}
+
+codeEmail.addEventListener("input", () => {
+  clearTimeout(sendTimer);
+  sendTimer = setTimeout(sendCode, AUTO_SEND_DELAY_MS);
+});
+codeEmail.addEventListener("blur", sendCode);
+codeInput.addEventListener("input", () => {
+  codeInput.value = codeInput.value.replace(/\D/g, "").slice(0, 6);
+  verifyCode();
+});
+codeForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (codeSent) verifyCode();
+  else sendCode();
 });
 
 codeRestart.addEventListener("click", () => {
   codeInput.value = "";
   showError("");
   showCodeStep(false);
+  codeEmail.focus();
 });
 
 switchMode.addEventListener("click", () => showPasswordForm(form.hidden));

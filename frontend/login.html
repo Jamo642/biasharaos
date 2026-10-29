@@ -41,9 +41,8 @@
             <span>6-digit code</span>
             <input id="code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}">
           </label>
-          <p id="code-info" class="auth-info" role="status" hidden></p>
-          <button id="code-submit" type="submit" class="auth-primary">Email me a code</button>
-          <button id="code-restart" type="button" class="auth-link" hidden>Use a different email or resend</button>
+          <button type="submit" hidden aria-hidden="true" tabindex="-1"></button>
+          <button id="code-restart" type="button" class="auth-link" hidden>Change email or resend code</button>
         </form>
 
         <form id="auth-form" novalidate>
