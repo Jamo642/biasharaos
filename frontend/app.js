@@ -18,11 +18,20 @@ async function api(path, options = {}) {
     body: options.body && typeof options.body !== "string" ? JSON.stringify(options.body) : options.body
   });
   const type = res.headers.get("content-type") || "";
+  if (res.status === 401) {
+    window.location.replace("/login.html");
+    throw new Error("Sign in required");
+  }
   if (!res.ok) throw new Error(type.includes("json") ? (await res.json()).error : await res.text());
   return type.includes("json") ? res.json() : res.text();
 }
 
 function el(id) { return document.getElementById(id); }
+
+el("signOut")?.addEventListener("click", async () => {
+  await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
+  window.location.replace("/login.html");
+});
 
 function activateTab(id, updateHash = true) {
   const target = el(id) ? id : "dashboard";

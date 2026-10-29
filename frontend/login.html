@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sign in · Biashara OS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/login.css">
+  </head>
+  <body>
+    <main class="auth-shell">
+      <section class="auth-card" aria-labelledby="auth-title">
+        <div class="auth-brand">
+          <div class="auth-mark" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </div>
+          <div>
+            <strong>Biashara OS</strong>
+            <span>Africa-first Business OS</span>
+          </div>
+        </div>
+
+        <h1 id="auth-title">Sign in</h1>
+        <p id="auth-subtitle" class="auth-sub">Welcome back. Sign in to your workspace.</p>
+
+        <form id="auth-form" novalidate>
+          <label id="name-field" class="auth-field" hidden>
+            <span>Your name</span>
+            <input id="name" name="name" type="text" autocomplete="name" maxlength="120">
+          </label>
+          <label class="auth-field">
+            <span>Email</span>
+            <input id="email" name="email" type="email" autocomplete="email" required>
+          </label>
+          <label class="auth-field">
+            <span>Password</span>
+            <div class="auth-password">
+              <input id="password" name="password" type="password" autocomplete="current-password" minlength="8" required>
+              <button type="button" id="toggle-password" class="auth-ghost" aria-label="Show password">Show</button>
+            </div>
+          </label>
+          <p id="auth-error" class="auth-error" role="alert" hidden></p>
+          <button id="auth-submit" type="submit" class="auth-primary">Sign in</button>
+        </form>
+
+        <p class="auth-foot">Karibu · Secure sign-in for your business</p>
+      </section>
+    </main>
+    <script src="/login.js"></script>
+  </body>
+</html>

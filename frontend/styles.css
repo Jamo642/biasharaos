@@ -3175,3 +3175,19 @@ pre {
   .fin-topbar-right { flex-wrap: wrap; }
 }
 
+
+/* ── Sign out ────────────────────────────────────────────── */
+.sign-out {
+  margin: 12px 0 0;
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-label);
+  background: var(--bg-panel);
+  cursor: pointer;
+}
+.sign-out:hover { color: var(--red); border-color: var(--red-border); background: var(--red-glow); }

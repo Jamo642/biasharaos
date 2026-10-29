@@ -3,6 +3,7 @@ const { readFileSync, existsSync, mkdirSync } = require("node:fs");
 const { join, extname } = require("node:path");
 const { randomUUID, createHmac, timingSafeEqual } = require("node:crypto");
 const { DatabaseSync } = require("node:sqlite");
+const { createAuth } = require("./auth");
 
 // Load .env. After the frontend/backend split, .env lives at the project
 // root (one level up from this file), but we also honour a backend/.env for
@@ -3425,8 +3426,8 @@ function parseBody(req) {
   });
 }
 
-function json(res, status, data) {
-  res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
+function json(res, status, data, headers = {}) {
+  res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store", ...headers });
   res.end(JSON.stringify(data));
 }
 
@@ -3450,7 +3451,23 @@ async function route(req, res) {
   try {
     if (!rateLimit(req)) return json(res, 429, { error: "Rate limit exceeded" });
     const url = new URL(req.url, `http://${req.headers.host}`);
-    if (!url.pathname.startsWith("/api/")) return serveStatic(req, res);
+    const account = auth.currentAccount(req);
+    if (!url.pathname.startsWith("/api/")) {
+      // The dashboard itself needs a signed-in account; assets and the sign-in page do not.
+      const isDashboard = url.pathname === "/" || url.pathname === "/index.html";
+      if (isDashboard && !account) {
+        res.writeHead(302, { location: "/login.html", "cache-control": "no-store" });
+        return res.end();
+      }
+      if (url.pathname === "/login.html" && account) {
+        res.writeHead(302, { location: "/", "cache-control": "no-store" });
+        return res.end();
+      }
+      return serveStatic(req, res);
+    }
+    if (url.pathname.startsWith("/api/auth/")) return authRoute(req, res, url, account);
+    // Webhooks are called by Africa's Talking / M-Pesa, not a browser, so they skip sign-in.
+    if (!account && !url.pathname.startsWith("/api/webhooks/")) return json(res, 401, { error: "Sign in required" });
     if (req.method === "GET" && (url.pathname === "/api/dashboard" || url.pathname === "/api/dashboard/summary")) return json(res, 200, dashboard());
     if (req.method === "GET" && url.pathname === "/api/schema") return json(res, 200, { schema: readFileSync(join(ROOT, "supabase-schema.sql"), "utf8") });
     const { raw, data } = await parseBody(req);
@@ -3709,7 +3726,29 @@ async function route(req, res) {
   }
 }
 
+async function authRoute(req, res, url, account) {
+  const clientIp = req.socket.remoteAddress || "local";
+  if (req.method === "GET" && url.pathname === "/api/auth/status") {
+    return json(res, 200, { authenticated: Boolean(account), account, needsSetup: auth.accountCount() === 0 });
+  }
+  if (req.method === "POST" && url.pathname === "/api/auth/logout") {
+    auth.logout(req);
+    return json(res, 200, { ok: true }, { "set-cookie": auth.sessionCookie(req, "") });
+  }
+  if (req.method !== "POST" || !["/api/auth/login", "/api/auth/register"].includes(url.pathname)) {
+    return json(res, 404, { error: "Not found" });
+  }
+  try {
+    const { data } = await parseBody(req);
+    const result = url.pathname === "/api/auth/login" ? auth.login(data, clientIp) : auth.registerFirstAccount(data);
+    return json(res, 200, { account: result.account }, { "set-cookie": auth.sessionCookie(req, result.token) });
+  } catch (err) {
+    return json(res, err.status || 400, { error: err.status ? err.message : "Invalid request" });
+  }
+}
+
 migrate();
+const auth = createAuth(db);
 if (DEMO_MODE) seed();
 http.createServer(route).listen(PORT, () => {
   console.log(`Biashara OS running on http://localhost:${PORT}`);

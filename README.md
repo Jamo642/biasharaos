@@ -29,6 +29,14 @@ Open `http://localhost:3000`.
 
 The app stores the configured business workspace and all channel activity in `backend/data/biashara.sqlite`. Demo seeding is disabled by default (`DEMO_MODE=false`); configure the workspace from the dashboard before recording live business data.
 
+## Sign in
+
+The dashboard and every `/api/*` route require a signed-in account. Webhooks (`/api/webhooks/*`) stay open because Africa's Talking and M-Pesa call them directly.
+
+- First visit: `/login.html` shows **Create owner account** (name, email, password of 8+ characters). This is only possible while no account exists.
+- After that, sign in with email and password. Sessions last 7 days (HttpOnly cookie) and **Sign out** is at the bottom of the sidebar.
+- Passwords are hashed with scrypt; logic lives in `backend/auth.js`. After 10 failed sign-ins, an IP is blocked for 15 minutes.
+
 ## Sandbox integrations
 
 Copy `.env.example` to `.env` or export the variables before running the server.
