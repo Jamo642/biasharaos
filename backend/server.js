@@ -4,7 +4,9 @@ const { join, extname } = require("node:path");
 const { randomUUID, createHmac, timingSafeEqual } = require("node:crypto");
 const { DatabaseSync } = require("node:sqlite");
 const { AsyncLocalStorage } = require("node:async_hooks");
+const { execFileSync } = require("node:child_process");
 const { createAuth } = require("./auth");
+const { storageConfig, createCloudBackup } = require("./cloud-backup");
 
 // Load .env. After the frontend/backend split, .env lives at the project
 // root (one level up from this file), but we also honour a backend/.env for
@@ -47,7 +49,25 @@ const EMAIL_CODES_ENABLED = Boolean(BREVO_API_KEY && BREVO_SENDER_EMAIL);
 const DEMO_MODE = process.env.DEMO_MODE === "true";
 
 if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
+
+// Render's free disk is wiped on restart, so pull the databases back from
+// Supabase Storage before opening any of them. If that fails, backups stay off
+// for this run so an empty disk never overwrites the good copies.
+const cloudConfig = storageConfig();
+let cloudRestoreOk = !cloudConfig.enabled;
+if (cloudConfig.enabled) {
+  try {
+    execFileSync(process.execPath, [join(ROOT, "cloud-restore.js"), DATA_DIR], { stdio: "inherit", timeout: 120000 });
+    cloudRestoreOk = true;
+  } catch {
+    console.error("Cloud restore failed: backups are disabled until the next restart.");
+  }
+}
+const cloud = createCloudBackup({ ...cloudConfig, enabled: cloudConfig.enabled && cloudRestoreOk });
+const backupPaths = new Map();
+
 const mainDb = new DatabaseSync(DB_PATH);
+backupPaths.set(mainDb, "biashara.sqlite");
 mainDb.exec("PRAGMA foreign_keys = ON");
 
 // Each Google account has its own SQLite file under data/tenants/. Requests run
@@ -72,6 +92,7 @@ function tenantDb(tenant) {
   tdb.exec("PRAGMA foreign_keys = ON");
   tenantContext.run(tdb, migrate);
   tenantDbs.set(tenant, tdb);
+  backupPaths.set(tdb, `tenants/${tenant}.sqlite`);
   return tdb;
 }
 
@@ -3494,7 +3515,7 @@ function verifyWebhook(req, body) {
 
 const rate = new Map();
 function rateLimit(req) {
-  const ip = req.socket.remoteAddress || "local";
+  const ip = clientIpOf(req);
   const bucket = rate.get(ip) || { count: 0, reset: Date.now() + 60000 };
   if (bucket.reset < Date.now()) Object.assign(bucket, { count: 0, reset: Date.now() + 60000 });
   bucket.count += 1;
@@ -3549,7 +3570,27 @@ async function route(req, res) {
     console.error("Workspace lookup failed:", err.message);
     return json(res, 500, { error: "Could not open your workspace" });
   }
-  return tenantContext.run(store, () => handleRequest(req, res, account));
+  try {
+    return await tenantContext.run(store, () => handleRequest(req, res, account));
+  } finally {
+    // Any write may have changed this workspace and, for sign-ins, the shared
+    // accounts/sessions tables, so queue both for backup.
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      markForBackup(mainDb);
+      markForBackup(store);
+    }
+  }
+}
+
+function markForBackup(store) {
+  if (backupPaths.has(store)) cloud.markDirty(backupPaths.get(store), store);
+}
+
+// Creates a brand-new account's workspace and queues it for backup.
+function provisionWorkspace(account) {
+  const store = tenantDb(account.tenant);
+  tenantContext.run(store, () => createStarterCompany(account.name));
+  markForBackup(store);
 }
 
 async function handleRequest(req, res, account) {
@@ -3830,11 +3871,30 @@ async function handleRequest(req, res, account) {
   }
 }
 
+// Behind Render's proxy every request comes from the proxy's address, so with
+// TRUST_PROXY=true the visitor's IP is read from True-Client-Ip, which the
+// Cloudflare layer in front of Render sets. X-Forwarded-For is not used: Render
+// appends to it, so a client could forge the first entry.
+const TRUST_PROXY = process.env.TRUST_PROXY === "true";
+const DEBUG_CLIENT_IP = process.env.DEBUG_CLIENT_IP === "true";
+function clientIpOf(req) {
+  if (TRUST_PROXY) {
+    const trusted = String(req.headers["true-client-ip"] || req.headers["cf-connecting-ip"] || "").trim();
+    if (trusted) return trusted;
+  }
+  return req.socket.remoteAddress || "local";
+}
+
 async function authRoute(req, res, url, account) {
-  const clientIp = req.socket.remoteAddress || "local";
+  const clientIp = clientIpOf(req);
   if (req.method === "GET" && url.pathname === "/api/auth/status") {
     const publicAccount = account ? { id: account.id, email: account.email, name: account.name } : null;
     return json(res, 200, { authenticated: Boolean(account), account: publicAccount, needsSetup: auth.accountCount() === 0 });
+  }
+  // Temporary check of which IP the proxy headers give; off unless DEBUG_CLIENT_IP=true.
+  if (DEBUG_CLIENT_IP && req.method === "GET" && url.pathname === "/api/auth/client-ip") {
+    const pick = (name) => req.headers[name] || null;
+    return json(res, 200, { clientIp: clientIp, trueClientIp: pick("true-client-ip"), cfConnectingIp: pick("cf-connecting-ip"), xForwardedFor: pick("x-forwarded-for") });
   }
   if (req.method === "GET" && url.pathname === "/api/auth/config") {
     return json(res, 200, { googleClientId: GOOGLE_CLIENT_ID || null, emailCodes: EMAIL_CODES_ENABLED });
@@ -3855,11 +3915,26 @@ async function authRoute(req, res, url, account) {
       return json(res, err.status || 502, { error: err.status ? err.message : "Could not send the code. Try again." });
     }
   }
+  if (req.method === "POST" && url.pathname === "/api/auth/signup") {
+    let email = "";
+    try {
+      if (!EMAIL_CODES_ENABLED) throw Object.assign(new Error("Sign-up is not available right now"), { status: 503 });
+      const { data } = await parseBody(req);
+      const created = auth.startSignup(data, clientIp);
+      email = created.email;
+      await sendLoginCodeEmail(created.email, created.code);
+      return json(res, 200, { codeSent: true, email: created.email });
+    } catch (err) {
+      if (email && !err.status) auth.discardEmailCode(email);
+      if (!err.status) console.error("Sign-up code email failed:", err.message);
+      return json(res, err.status || 502, { error: err.status ? err.message : "Could not send the code. Try again." });
+    }
+  }
   if (req.method === "POST" && url.pathname === "/api/auth/email/verify") {
     try {
       const { data } = await parseBody(req);
-      const result = auth.verifyEmailCode(data.email, data.code);
-      if (result.isNew) tenantContext.run(tenantDb(result.account.tenant), () => createStarterCompany(result.account.name));
+      const result = auth.verifyEmailCode(data.email, data.code, clientIp);
+      if (result.isNew) provisionWorkspace(result.account);
       const { id: accountId, email, name } = result.account;
       return json(res, 200, { account: { id: accountId, email, name } }, { "set-cookie": auth.sessionCookie(req, result.token) });
     } catch (err) {
@@ -3885,8 +3960,8 @@ async function authRoute(req, res, url, account) {
         }
         return json(res, 200, { codeSent: true, email: created.email });
       }
-      const result = auth.googleLogin(claims);
-      if (result.isNew) tenantContext.run(tenantDb(result.account.tenant), () => createStarterCompany(result.account.name));
+      const result = auth.googleLogin(claims, clientIp);
+      if (result.isNew) provisionWorkspace(result.account);
       const { id: accountId, email, name } = result.account;
       return json(res, 200, { account: { id: accountId, email, name } }, { "set-cookie": auth.sessionCookie(req, result.token) });
     } catch (err) {
@@ -3913,8 +3988,19 @@ migrate();
 const auth = createAuth(mainDb);
 if (DEMO_MODE) seed();
 http.createServer(route).listen(PORT, () => {
-  console.log(`Biashara OS running on http://localhost:${PORT}`);
+  console.log(`Biashara OS running on http://localhost:${PORT}${cloud.enabled ? " (Supabase backup on)" : ""}`);
 });
+
+// Render stops the instance with SIGTERM: upload anything still pending first.
+for (const signal of ["SIGTERM", "SIGINT"]) {
+  process.once(signal, async () => {
+    try {
+      await cloud.flush();
+    } finally {
+      process.exit(0);
+    }
+  });
+}
 
 // ── SMS alert scheduler ───────────────────────────────────────────────────────
 // Sends three types of automatic SMS via Africa's Talking:

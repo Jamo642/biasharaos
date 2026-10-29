@@ -16,6 +16,8 @@ const CODE_MAX_ATTEMPTS = 5;
 const CODE_RESEND_MS = 60 * 1000;
 const CODE_IP_WINDOW_MS = 60 * 60 * 1000;
 const CODE_IP_MAX = 10;
+const SIGNUP_WINDOW_MS = 24 * 60 * 60 * 1000;
+const SIGNUP_IP_MAX = Math.max(1, Number(process.env.SIGNUP_LIMIT_PER_IP) || 3);
 
 function createAuth(db) {
   db.exec(`
@@ -34,11 +36,23 @@ function createAuth(db) {
   `);
   const accountColumns = db.prepare("PRAGMA table_info(accounts)").all().map((c) => c.name);
   if (!accountColumns.includes("tenant")) db.exec("ALTER TABLE accounts ADD COLUMN tenant TEXT");
+  if (!accountColumns.includes("created_ip")) db.exec("ALTER TABLE accounts ADD COLUMN created_ip TEXT");
   const codeColumns = db.prepare("PRAGMA table_info(email_codes)").all().map((c) => c.name);
   if (!codeColumns.includes("name")) db.exec("ALTER TABLE email_codes ADD COLUMN name TEXT");
+  if (!codeColumns.includes("pending_password_hash")) db.exec("ALTER TABLE email_codes ADD COLUMN pending_password_hash TEXT");
 
   const failures = new Map();
   const codeRequests = new Map();
+
+  // New accounts per IP per day, counted from the accounts table so the limit
+  // survives restarts (the table is backed up with everything else).
+  function assertCanCreateAccount(ip) {
+    const since = new Date(Date.now() - SIGNUP_WINDOW_MS).toISOString();
+    const { n } = db.prepare("SELECT COUNT(*) AS n FROM accounts WHERE created_ip = ? AND created_at > ?").get(String(ip || ""), since);
+    if (n >= SIGNUP_IP_MAX) {
+      throw httpError(429, "Too many accounts have been created from this network today. Try again tomorrow.");
+    }
+  }
 
   const hashToken = (token) => createHash("sha256").update(token).digest("hex");
 
@@ -93,33 +107,35 @@ function createAuth(db) {
   // Google or an emailed code). A new email gets an account with its own empty
   // workspace. `method` is stored in place of a password hash; it is not a valid
   // scrypt hash, so password sign-in stays impossible for these accounts.
-  function loginVerifiedEmail(rawEmail, rawName, method) {
+  function loginVerifiedEmail(rawEmail, rawName, method, ip) {
     const email = String(rawEmail || "").trim().toLowerCase();
     if (!EMAIL_RE.test(email) || email.length > 254) throw httpError(400, "No usable email address");
     const existing = db.prepare("SELECT id, email, name, tenant FROM accounts WHERE email = ?").get(email);
     if (existing) {
       return { token: createSession(existing.id), account: { id: existing.id, email, name: existing.name, tenant: existing.tenant }, isNew: false };
     }
+    assertCanCreateAccount(ip);
     const name = String(rawName || email.split("@")[0]).trim().slice(0, 120);
     const id = randomUUID();
     const tenant = randomUUID();
-    db.prepare("INSERT INTO accounts (id, email, name, password_hash, created_at, tenant) VALUES (?,?,?,?,?,?)")
-      .run(id, email, name, method, new Date().toISOString(), tenant);
+    db.prepare("INSERT INTO accounts (id, email, name, password_hash, created_at, tenant, created_ip) VALUES (?,?,?,?,?,?,?)")
+      .run(id, email, name, method, new Date().toISOString(), tenant, String(ip || ""));
     return { token: createSession(id), account: { id, email, name, tenant }, isNew: true };
   }
 
   // `claims` must already be verified as a genuine Google ID token for this app.
-  function googleLogin(claims) {
-    return loginVerifiedEmail(claims.email, claims.name, "google");
+  function googleLogin(claims, ip) {
+    return loginVerifiedEmail(claims.email, claims.name, "google", ip);
   }
 
   const codeHash = (email, code) => hashToken(`${email}:${code}`);
 
   // Creates a 6-digit sign-in code for `email` and returns it so the caller can
   // email it. Only a hash is stored. Limited per email (one per minute) and per IP.
-  // `name` is kept for naming a new account. With `reuseRecent`, a code sent
+  // `name` is kept for naming a new account and `passwordHash` (sign-up) is only
+  // applied once the code proves the email. With `reuseRecent`, a code sent
   // within the last minute is kept and `code` comes back null (nothing to send).
-  function createEmailCode(rawEmail, ip, { name = null, reuseRecent = false } = {}) {
+  function createEmailCode(rawEmail, ip, { name = null, passwordHash = null, reuseRecent = false } = {}) {
     const email = String(rawEmail || "").trim().toLowerCase();
     if (!EMAIL_RE.test(email) || email.length > 254) throw httpError(400, "Enter a valid email address");
     const nowMs = Date.now();
@@ -134,8 +150,9 @@ function createAuth(db) {
     codeRequests.set(ip, { ...current, count: current.count + 1 });
     const code = String(randomInt(0, 1000000)).padStart(6, "0");
     db.prepare("DELETE FROM email_codes WHERE expires_at < ?").run(nowMs);
-    db.prepare("INSERT OR REPLACE INTO email_codes (email, code_hash, expires_at, attempts, sent_at, name) VALUES (?,?,?,0,?,?)")
-      .run(email, codeHash(email, code), nowMs + CODE_TTL_MS, nowMs, name ? String(name).slice(0, 120) : null);
+    db.prepare(`INSERT OR REPLACE INTO email_codes (email, code_hash, expires_at, attempts, sent_at, name, pending_password_hash)
+      VALUES (?,?,?,0,?,?,?)`)
+      .run(email, codeHash(email, code), nowMs + CODE_TTL_MS, nowMs, name ? String(name).slice(0, 120) : null, passwordHash);
     return { email, code };
   }
 
@@ -143,7 +160,7 @@ function createAuth(db) {
     db.prepare("DELETE FROM email_codes WHERE email = ?").run(String(email || "").trim().toLowerCase());
   }
 
-  function verifyEmailCode(rawEmail, rawCode) {
+  function verifyEmailCode(rawEmail, rawCode, ip) {
     const email = String(rawEmail || "").trim().toLowerCase();
     const code = String(rawCode || "").replace(/\s+/g, "");
     if (!/^\d{6}$/.test(code)) throw httpError(400, "Enter the 6-digit code from your email");
@@ -159,7 +176,26 @@ function createAuth(db) {
       throw httpError(401, "Wrong code. Check the email and try again.");
     }
     discardEmailCode(email);
-    return loginVerifiedEmail(email, row.name, "email-code");
+    const result = loginVerifiedEmail(email, row.name, "email-code", ip);
+    if (row.pending_password_hash) {
+      db.prepare("UPDATE accounts SET password_hash = ? WHERE id = ?").run(row.pending_password_hash, result.account.id);
+    }
+    return result;
+  }
+
+  // Sign-up: name + email + password. The account is only created (or, for an
+  // existing Google/code account, given this password) after the emailed code
+  // is confirmed, so nobody can sign up with an address they don't own.
+  function startSignup(data, ip) {
+    const { email, password } = validateCredentials(data);
+    const name = String(data.name || "").trim().slice(0, 120);
+    if (!name) throw httpError(400, "Enter your name");
+    const existing = db.prepare("SELECT password_hash FROM accounts WHERE email = ?").get(email);
+    if (existing && String(existing.password_hash).startsWith("scrypt$")) {
+      throw httpError(409, "An account with this email already exists. Sign in instead.");
+    }
+    if (!existing) assertCanCreateAccount(ip);
+    return createEmailCode(email, ip, { name, passwordHash: hashPassword(password) });
   }
 
   function login(data, ip) {
@@ -210,7 +246,7 @@ function createAuth(db) {
     return `${COOKIE_NAME}=${token || ""}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${secure}`;
   }
 
-  return { accountCount, registerFirstAccount, googleLogin, createEmailCode, discardEmailCode, verifyEmailCode, login, logout, currentAccount, sessionCookie };
+  return { accountCount, registerFirstAccount, startSignup, googleLogin, createEmailCode, discardEmailCode, verifyEmailCode, login, logout, currentAccount, sessionCookie };
 }
 
 function httpError(status, message) {

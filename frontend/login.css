@@ -114,3 +114,6 @@ h1 { margin: 0 0 6px; font-size: 22px; font-weight: 700; }
 
 /* Classes above set display, which would otherwise override the hidden attribute. */
 [hidden] { display: none !important; }
+
+.auth-switch { margin: 18px 0 0; text-align: center; font-size: 13px; color: var(--muted); }
+.auth-link-inline { display: inline; margin: 0; padding: 0 2px; }
