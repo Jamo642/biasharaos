@@ -57,7 +57,7 @@ async function postJson(path, body) {
     body: JSON.stringify(body)
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || "Something went wrong. Try again.");
+  if (!res.ok) throw Object.assign(new Error(data.error || "Something went wrong. Try again."), { needsSignup: Boolean(data.needsSignup) });
   return data;
 }
 
@@ -142,6 +142,18 @@ form.addEventListener("submit", async (event) => {
   submit.textContent = label;
 });
 
+// Google (or an email code) for an email with no account: open sign-up with the
+// details filled in so they only need to choose a password.
+function startSignupFor(email, name) {
+  showView("signup");
+  emailInput.value = email;
+  if (name) nameInput.value = name;
+  authSubtitle.textContent = `No account found for ${email}. Choose a password to create one.`;
+  // Focus a moment later so the Enter key that sent the email isn't also
+  // taken as submitting the sign-up form.
+  setTimeout(() => (name ? passwordInput : nameInput).focus(), 300);
+}
+
 async function sendCode() {
   clearTimeout(sendTimer);
   const email = codeEmail.value.trim();
@@ -152,6 +164,8 @@ async function sendCode() {
     await postJson("/api/auth/email/request", { email });
     showCodeStep(true);
   } catch (err) {
+    busy = false;
+    if (err.needsSignup) return startSignupFor(email, "");
     showError(err.message);
   }
   busy = false;
@@ -216,6 +230,7 @@ async function handleGoogleCredential(response) {
   showError("");
   try {
     const data = await postJson("/api/auth/google", { credential: response.credential });
+    if (data.needsSignup) return startSignupFor(data.email, data.name);
     if (!data.codeSent) return window.location.replace("/");
     waitForCode(data.email, "Confirm it's you");
   } catch (err) {

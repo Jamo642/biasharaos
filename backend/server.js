@@ -3876,7 +3876,6 @@ async function handleRequest(req, res, account) {
 // Cloudflare layer in front of Render sets. X-Forwarded-For is not used: Render
 // appends to it, so a client could forge the first entry.
 const TRUST_PROXY = process.env.TRUST_PROXY === "true";
-const DEBUG_CLIENT_IP = process.env.DEBUG_CLIENT_IP === "true";
 function clientIpOf(req) {
   if (TRUST_PROXY) {
     const trusted = String(req.headers["true-client-ip"] || req.headers["cf-connecting-ip"] || "").trim();
@@ -3891,11 +3890,6 @@ async function authRoute(req, res, url, account) {
     const publicAccount = account ? { id: account.id, email: account.email, name: account.name } : null;
     return json(res, 200, { authenticated: Boolean(account), account: publicAccount, needsSetup: auth.accountCount() === 0 });
   }
-  // Temporary check of which IP the proxy headers give; off unless DEBUG_CLIENT_IP=true.
-  if (DEBUG_CLIENT_IP && req.method === "GET" && url.pathname === "/api/auth/client-ip") {
-    const pick = (name) => req.headers[name] || null;
-    return json(res, 200, { clientIp: clientIp, trueClientIp: pick("true-client-ip"), cfConnectingIp: pick("cf-connecting-ip"), xForwardedFor: pick("x-forwarded-for") });
-  }
   if (req.method === "GET" && url.pathname === "/api/auth/config") {
     return json(res, 200, { googleClientId: GOOGLE_CLIENT_ID || null, emailCodes: EMAIL_CODES_ENABLED });
   }
@@ -3904,6 +3898,9 @@ async function authRoute(req, res, url, account) {
     try {
       if (!EMAIL_CODES_ENABLED) throw Object.assign(new Error("Email sign-in is not configured"), { status: 503 });
       const { data } = await parseBody(req);
+      if (!auth.accountExists(data.email)) {
+        return json(res, 404, { error: "No account found for this email. Create an account first.", needsSignup: true });
+      }
       const created = auth.createEmailCode(data.email, clientIp);
       email = created.email;
       await sendLoginCodeEmail(created.email, created.code);
@@ -3945,6 +3942,10 @@ async function authRoute(req, res, url, account) {
     try {
       const { data } = await parseBody(req);
       const claims = await verifyGoogleIdToken(data.credential);
+      // No account for this Google email yet: send them to sign-up instead.
+      if (!auth.accountExists(claims.email)) {
+        return json(res, 200, { needsSignup: true, email: String(claims.email).toLowerCase(), name: String(claims.name || "").slice(0, 120) });
+      }
       // When email can be sent, Google sign-in also needs the emailed code:
       // send it here and let the browser finish through /api/auth/email/verify.
       if (EMAIL_CODES_ENABLED) {

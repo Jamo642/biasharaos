@@ -123,6 +123,11 @@ function createAuth(db) {
     return { token: createSession(id), account: { id, email, name, tenant }, isNew: true };
   }
 
+  function accountExists(rawEmail) {
+    const email = String(rawEmail || "").trim().toLowerCase();
+    return Boolean(db.prepare("SELECT 1 FROM accounts WHERE email = ?").get(email));
+  }
+
   // `claims` must already be verified as a genuine Google ID token for this app.
   function googleLogin(claims, ip) {
     return loginVerifiedEmail(claims.email, claims.name, "google", ip);
@@ -246,7 +251,7 @@ function createAuth(db) {
     return `${COOKIE_NAME}=${token || ""}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${secure}`;
   }
 
-  return { accountCount, registerFirstAccount, startSignup, googleLogin, createEmailCode, discardEmailCode, verifyEmailCode, login, logout, currentAccount, sessionCookie };
+  return { accountCount, accountExists, registerFirstAccount, startSignup, googleLogin, createEmailCode, discardEmailCode, verifyEmailCode, login, logout, currentAccount, sessionCookie };
 }
 
 function httpError(status, message) {
