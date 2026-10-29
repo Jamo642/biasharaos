@@ -46,6 +46,7 @@ const BREVO_API_KEY = String(process.env.BREVO_API_KEY || "").trim();
 const BREVO_SENDER_EMAIL = String(process.env.BREVO_SENDER_EMAIL || "").trim();
 const BREVO_SENDER_NAME = String(process.env.BREVO_SENDER_NAME || "Biashara OS").trim();
 const EMAIL_CODES_ENABLED = Boolean(BREVO_API_KEY && BREVO_SENDER_EMAIL);
+const WEBHOOK_ACCOUNT_EMAIL = String(process.env.WEBHOOK_ACCOUNT_EMAIL || "").trim().toLowerCase();
 const DEMO_MODE = process.env.DEMO_MODE === "true";
 
 if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
@@ -3447,7 +3448,7 @@ async function ussdResponse(text, phone, sessionId, aiTimeoutMs = Math.max(3_000
   // ── Option 4: Check Stock ─────────────────────────────────────────────────
   if (parts[0] === "4") {
     const inv = all("SELECT item_name, quantity, unit, reorder_level FROM inventory ORDER BY item_type, item_name")
-      .map(i => `${i.item_name}: ${i.quantity}${i.unit}${Number(i.quantity) <= Number(i.reorder_level) ? " *LOW*" : ""}`)
+      .map(i => `${i.item_name}: ${i.quantity}${i.unit}${Number(i.quantity) <= Number(i.reorder_level) ? " (LOW)" : ""}`)
       .join("\n");
     return `END Stock\n${inv || "No stock records yet."}`;
   }
@@ -3628,6 +3629,12 @@ async function route(req, res) {
   try {
     account = auth.currentAccount(req);
     store = dbForAccount(account);
+    const path = new URL(req.url, `http://${req.headers.host}`).pathname;
+    if (!account && WEBHOOK_ACCOUNT_EMAIL && path.startsWith("/api/webhooks/africastalking/")) {
+      // Africa's Talking has no signed-in account; route its requests to the configured workspace.
+      const webhookAccount = mainDb.prepare("SELECT id, email, name, tenant FROM accounts WHERE email = ?").get(WEBHOOK_ACCOUNT_EMAIL);
+      if (webhookAccount && webhookAccount.tenant) store = tenantDb(webhookAccount.tenant);
+    }
   } catch (err) {
     console.error("Workspace lookup failed:", err.message);
     return json(res, 500, { error: "Could not open your workspace" });
@@ -3705,8 +3712,8 @@ async function handleRequest(req, res, account) {
       return json(res, 200, result.ok ? { ok: true, status: "CONNECTED" } : { ok: false, status: "ERROR", error: AI_BUSY_MESSAGE });
     }
     if (req.method === "POST" && url.pathname === "/api/webhooks/africastalking/sms") {
-      const result = await handleAiMessage({ message: data.text || data.message, channel: "SMS", phone: data.from || data.phoneNumber || "+254700000004" });
-      return json(res, 200, result);
+      const result = stripAiMeta(await handleAiMessage({ message: data.text || data.message, channel: "SMS", phone: data.from || data.phoneNumber || "+254700000004" }));
+      return json(res, 200, { ...result, response: toPlainText(result.response) });
     }
     if (req.method === "POST" && url.pathname === "/api/webhooks/africastalking/ussd") {
       res.writeHead(200, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" });
