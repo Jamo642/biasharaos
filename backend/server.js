@@ -190,6 +190,10 @@ function migrate() {
       id TEXT PRIMARY KEY, company_id TEXT NOT NULL, invoice_id TEXT NOT NULL, provider TEXT NOT NULL,
       amount REAL NOT NULL, reference TEXT NOT NULL, status TEXT NOT NULL, raw_payload TEXT, created_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS mpesa_stk_requests (
+      checkout_request_id TEXT PRIMARY KEY, merchant_request_id TEXT, invoice_id TEXT NOT NULL, amount REAL NOT NULL,
+      phone TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'PENDING', result_desc TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS sales_transactions (
       id TEXT PRIMARY KEY, company_id TEXT NOT NULL, item_name TEXT NOT NULL, quantity REAL NOT NULL,
       unit TEXT NOT NULL, amount REAL NOT NULL, customer_id TEXT, customer_name TEXT, payment_status TEXT NOT NULL DEFAULT 'PAID',
@@ -1602,6 +1606,10 @@ async function initiateStkPush({ phone, amount, invoiceId }) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.errorMessage || data.error || "Daraja STK Push failed");
+  if (data.CheckoutRequestID) run("INSERT OR REPLACE INTO mpesa_stk_requests (checkout_request_id,merchant_request_id,invoice_id,amount,phone,status,result_desc,created_at,updated_at) VALUES (:checkout_request_id,:merchant_request_id,:invoice_id,:amount,:phone,'PENDING',NULL,:created_at,:updated_at)", {
+    checkout_request_id: data.CheckoutRequestID, merchant_request_id: data.MerchantRequestID || null,
+    invoice_id: invoiceId, amount: Number(amount), phone: String(phone), created_at: now(), updated_at: now()
+  });
   audit({ action: "initiateStkPush", entityType: "invoice", entityId: invoiceId, after: data, source: "mpesa" });
   return data;
 }
@@ -3707,8 +3715,8 @@ async function route(req, res) {
     account = auth.currentAccount(req);
     store = dbForAccount(account);
     const path = new URL(req.url, `http://${req.headers.host}`).pathname;
-    if (!account && WEBHOOK_ACCOUNT_EMAIL && path.startsWith("/api/webhooks/africastalking/")) {
-      // Africa's Talking has no signed-in account; route its requests to the configured workspace.
+    if (!account && WEBHOOK_ACCOUNT_EMAIL && (path.startsWith("/api/webhooks/africastalking/") || path.startsWith("/api/webhooks/mpesa/"))) {
+      // Provider callbacks have no signed-in account; route them to the configured workspace.
       const webhookAccount = mainDb.prepare("SELECT id, email, name, tenant FROM accounts WHERE email = ?").get(WEBHOOK_ACCOUNT_EMAIL);
       if (webhookAccount && webhookAccount.tenant) store = tenantDb(webhookAccount.tenant);
     }
@@ -3765,7 +3773,11 @@ async function handleRequest(req, res, account) {
     // Africa's Talking webhooks (USSD, SMS, Voice) do not send x-biashara-signature,
     // so skip the signature check for AT paths and only apply it to non-AT webhooks.
     const isAtWebhook = url.pathname.startsWith("/api/webhooks/africastalking/");
-    if (url.pathname.includes("/webhooks/") && !isAtWebhook && !verifyWebhook(req, raw)) return json(res, 401, { error: "Invalid webhook signature" });
+    const isMpesaCallback = req.method === "POST" && url.pathname === "/api/webhooks/mpesa/callback";
+    const callbackToken = String(url.searchParams.get("token") || "");
+    const expectedToken = String(process.env.MPESA_CALLBACK_TOKEN || "");
+    const tokenMatches = Boolean(expectedToken) && Buffer.byteLength(callbackToken) === Buffer.byteLength(expectedToken) && timingSafeEqual(Buffer.from(callbackToken), Buffer.from(expectedToken));
+    if (url.pathname.includes("/webhooks/") && !isAtWebhook && !isMpesaCallback && !verifyWebhook(req, raw)) return json(res, 401, { error: "Invalid webhook signature" });
     if (req.method === "POST" && url.pathname === "/api/ai/message") {
       if (!takeAiAllowance(account)) return json(res, 429, { error: AI_LIMIT_MESSAGE });
       try {
@@ -3810,7 +3822,37 @@ async function handleRequest(req, res, account) {
       return res.end(await voiceResponse(data));
     }
     if (req.method === "POST" && url.pathname === "/api/webhooks/mpesa/callback") {
-      return json(res, 200, recordPayment({ invoiceId: data.invoiceId, amount: data.amount, reference: data.reference, rawPayload: data }));
+      const signedCustomRequest = Boolean(data.invoiceId && req.headers["x-biashara-signature"] && verifyWebhook(req, raw));
+      if (signedCustomRequest) {
+        return json(res, 200, recordPayment({ invoiceId: data.invoiceId, amount: data.amount, reference: data.reference, rawPayload: data }));
+      }
+      if (!tokenMatches) return json(res, 401, { error: "Invalid callback token" });
+      const callback = data.Body?.stkCallback;
+      if (!callback?.CheckoutRequestID) {
+        console.error("Ignoring M-Pesa callback without CheckoutRequestID");
+        return json(res, 200, { ResultCode: 0, ResultDesc: "Accepted" });
+      }
+      const request = get("SELECT * FROM mpesa_stk_requests WHERE checkout_request_id=:id", { id: callback.CheckoutRequestID });
+      if (!request) {
+        console.error("Ignoring unknown M-Pesa CheckoutRequestID:", callback.CheckoutRequestID);
+        return json(res, 200, { ResultCode: 0, ResultDesc: "Accepted" });
+      }
+      if (request.status === "PENDING") {
+        const resultCode = Number(callback.ResultCode);
+        if (resultCode === 0) {
+          const metadata = callback.CallbackMetadata?.Item || [];
+          const value = (name) => metadata.find(item => item.Name === name)?.Value;
+          const amount = Number(value("Amount") ?? request.amount);
+          const reference = value("MpesaReceiptNumber") || callback.CheckoutRequestID;
+          withTransaction(() => {
+            recordPayment({ invoiceId: request.invoice_id, amount, reference, rawPayload: data });
+            run("UPDATE mpesa_stk_requests SET status='PAID', result_desc=:desc, updated_at=:updated_at WHERE checkout_request_id=:id AND status='PENDING'", { id: request.checkout_request_id, desc: callback.ResultDesc || "Success", updated_at: now() });
+          });
+        } else {
+          run("UPDATE mpesa_stk_requests SET status='FAILED', result_desc=:desc, updated_at=:updated_at WHERE checkout_request_id=:id AND status='PENDING'", { id: request.checkout_request_id, desc: callback.ResultDesc || "Payment failed", updated_at: now() });
+        }
+      }
+      return json(res, 200, { ResultCode: 0, ResultDesc: "Accepted" });
     }
     if (req.method === "POST" && url.pathname === "/api/mpesa/stk-push") {
       return json(res, 200, await initiateStkPush(data));
