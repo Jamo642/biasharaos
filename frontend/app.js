@@ -346,8 +346,6 @@ function render() {
   (function renderDashboard() {
     // Business name — set sidebar + welcome title (keep SVG heart in title)
     const companyName = (data.company && data.company.name) || "Your Business";
-    const bn = el("businessName");
-    if (bn) bn.textContent = companyName;
     const dbn = el("dbBusinessName");
     if (dbn) {
       // Set text while preserving the heart SVG child
@@ -591,23 +589,6 @@ function render() {
             <div class="db-platform-track"><div class="db-platform-fill" style="width:${barW}%"></div></div>
           </div>`;
         }).join("");
-      }
-    }
-
-    // ── Banner dynamic title ──
-    const bannerTitle = el("dbBannerTitle");
-    const bannerSub   = el("dbBannerSub");
-    if (bannerTitle && bannerSub) {
-      const mPf = fin.month || {};
-      if ((mPf.revenue || 0) === 0) {
-        bannerTitle.textContent = "Get started!";
-        bannerSub.textContent   = "Record your first sale, purchase, or expense to see insights here.";
-      } else if ((mPf.profit || 0) < 0) {
-        bannerTitle.textContent = "Keep going!";
-        bannerSub.textContent   = "Your expenses are high this month. Review costs and keep recording.";
-      } else {
-        bannerTitle.textContent = "Amazing work!";
-        bannerSub.textContent   = "Your consistency, care, and connection are driving real results.";
       }
     }
   })();
@@ -1958,12 +1939,6 @@ function render() {
     }).join("") || `<div class="bubble">Welcome to Biashara OS. Try: "Nimenunua chuma kilo 100 kwa 30,000" or "How much profit did I make this week?"</div>`;
   }
 
-  const ai = data.ai || {};
-  const aiMeta = el("aiMeta");
-  if (aiMeta) aiMeta.innerHTML = `
-    <div><strong>${escapeHtml(ai.provider || "AI")}</strong> ${pill(ai.status || "UNKNOWN")}</div>
-    <small class="model-used">${escapeHtml(ai.model || "")}</small>
-  `;
 
   const integrationsList = el("integrationsList");
   if (integrationsList) integrationsList.innerHTML = (data.integrations || []).map((i) => `
