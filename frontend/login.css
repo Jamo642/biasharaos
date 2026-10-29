@@ -99,3 +99,15 @@ h1 { margin: 0 0 6px; font-size: 22px; font-weight: 700; }
   margin: 20px 0 0; font-size: 12px; color: var(--muted);
 }
 .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: currentColor; opacity: 0.25; }
+
+.auth-info {
+  margin: 0 0 16px; padding: 10px 12px; border-radius: 8px;
+  font-size: 13px; color: var(--green-dark); background: var(--green-glow);
+}
+.auth-link {
+  display: block; margin: 14px auto 0; padding: 4px 8px; border: 0;
+  font: inherit; font-size: 13px; font-weight: 600;
+  color: var(--green-dark); background: transparent; cursor: pointer;
+}
+.auth-link:hover { text-decoration: underline; }
+#code { letter-spacing: 6px; font-size: 18px; font-weight: 600; }

@@ -103,4 +103,83 @@ window.initGoogleSignIn = async function initGoogleSignIn() {
   document.getElementById("google-block").hidden = false;
 };
 
+// Email code sign-in: type an email, receive a 6-digit code, enter it.
+// Shown instead of the password form when the server can send email.
+const codeForm = document.getElementById("code-form");
+const codeEmail = document.getElementById("code-email");
+const codeField = document.getElementById("code-field");
+const codeInput = document.getElementById("code");
+const codeInfo = document.getElementById("code-info");
+const codeSubmit = document.getElementById("code-submit");
+const codeRestart = document.getElementById("code-restart");
+const switchMode = document.getElementById("switch-mode");
+let codeSent = false;
+
+function showCodeStep(sent) {
+  codeSent = sent;
+  codeField.hidden = !sent;
+  codeRestart.hidden = !sent;
+  codeEmail.readOnly = sent;
+  codeInfo.hidden = !sent;
+  codeInfo.textContent = sent ? `We sent a code to ${codeEmail.value.trim()}. Check your spam folder if it is not in your inbox.` : "";
+  codeSubmit.textContent = sent ? "Sign in" : "Email me a code";
+  if (sent) codeInput.focus();
+}
+
+function showPasswordForm(usePassword) {
+  form.hidden = !usePassword;
+  codeForm.hidden = usePassword;
+  switchMode.textContent = usePassword ? "Email me a code instead" : "Use password instead";
+  showError("");
+}
+
+async function postJson(path, body) {
+  const res = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Something went wrong. Try again.");
+  return data;
+}
+
+codeForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  showError("");
+  const email = codeEmail.value.trim();
+  if (!email) return showError("Enter your email address.");
+  const label = codeSubmit.textContent;
+  codeSubmit.disabled = true;
+  codeSubmit.textContent = codeSent ? "Signing in…" : "Sending…";
+  try {
+    if (!codeSent) {
+      await postJson("/api/auth/email/request", { email });
+      showCodeStep(true);
+    } else {
+      await postJson("/api/auth/email/verify", { email, code: codeInput.value.trim() });
+      return window.location.replace("/");
+    }
+  } catch (err) {
+    showError(err.message);
+  }
+  codeSubmit.disabled = false;
+  if (codeSubmit.textContent.endsWith("…")) codeSubmit.textContent = label;
+});
+
+codeRestart.addEventListener("click", () => {
+  codeInput.value = "";
+  showError("");
+  showCodeStep(false);
+});
+
+switchMode.addEventListener("click", () => showPasswordForm(form.hidden));
+
+googleConfig.then(({ emailCodes }) => {
+  if (!emailCodes) return;
+  switchMode.hidden = false;
+  showPasswordForm(false);
+});
+
 loadStatus();

@@ -15,3 +15,7 @@ services:
         value: "false"
       - key: GOOGLE_CLIENT_ID
         sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_SENDER_EMAIL
+        sync: false

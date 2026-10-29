@@ -40,6 +40,10 @@ const DB_PATH = join(DATA_DIR, "biashara.sqlite");
 const TENANT_DIR = join(DATA_DIR, "tenants");
 const TENANT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const GOOGLE_CLIENT_ID = String(process.env.GOOGLE_CLIENT_ID || "").trim();
+const BREVO_API_KEY = String(process.env.BREVO_API_KEY || "").trim();
+const BREVO_SENDER_EMAIL = String(process.env.BREVO_SENDER_EMAIL || "").trim();
+const BREVO_SENDER_NAME = String(process.env.BREVO_SENDER_NAME || "Biashara OS").trim();
+const EMAIL_CODES_ENABLED = Boolean(BREVO_API_KEY && BREVO_SENDER_EMAIL);
 const DEMO_MODE = process.env.DEMO_MODE === "true";
 
 if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
@@ -1417,6 +1421,29 @@ function createStarterCompany(ownerName) {
   const firstName = String(ownerName || "").trim().split(/\s+/)[0] || "My";
   run("INSERT INTO companies VALUES (:id,:name,:city,:created_at)", { id: cid, name: `${firstName}'s Business`, city: "Kenya", created_at: t });
   run("INSERT INTO users VALUES (:id,:company_id,:name,:phone,'OWNER',:created_at)", { id: id("usr"), company_id: cid, name: String(ownerName || "Owner").slice(0, 120), phone: "", created_at: t });
+}
+
+// Sends the sign-in code through Brevo's HTTPS API (SMTP ports are blocked on
+// Render's free plan, so plain Gmail SMTP would never deliver from there).
+async function sendLoginCodeEmail(email, code) {
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: { "api-key": BREVO_API_KEY, "content-type": "application/json", accept: "application/json" },
+    signal: AbortSignal.timeout(10000),
+    body: JSON.stringify({
+      sender: { email: BREVO_SENDER_EMAIL, name: BREVO_SENDER_NAME },
+      to: [{ email }],
+      subject: `${code} is your Biashara OS sign-in code`,
+      textContent: `Your Biashara OS sign-in code is ${code}\n\nIt expires in 10 minutes. If you did not ask for it, ignore this email.`,
+      htmlContent: `<div style="font-family:Arial,sans-serif;max-width:420px;margin:auto;padding:24px">
+        <h2 style="margin:0 0 8px;color:#14532d">Biashara OS</h2>
+        <p style="margin:0 0 16px;color:#334155">Your sign-in code is:</p>
+        <p style="font-size:32px;letter-spacing:8px;font-weight:700;margin:0 0 16px;color:#0f172a">${code}</p>
+        <p style="margin:0;color:#64748b;font-size:13px">It expires in 10 minutes. If you did not ask for it, ignore this email.</p>
+      </div>`
+    })
+  });
+  if (!res.ok) throw new Error(`Brevo responded ${res.status}: ${(await res.text()).slice(0, 200)}`);
 }
 
 const GOOGLE_ISSUERS = new Set(["accounts.google.com", "https://accounts.google.com"]);
@@ -3810,7 +3837,34 @@ async function authRoute(req, res, url, account) {
     return json(res, 200, { authenticated: Boolean(account), account: publicAccount, needsSetup: auth.accountCount() === 0 });
   }
   if (req.method === "GET" && url.pathname === "/api/auth/config") {
-    return json(res, 200, { googleClientId: GOOGLE_CLIENT_ID || null });
+    return json(res, 200, { googleClientId: GOOGLE_CLIENT_ID || null, emailCodes: EMAIL_CODES_ENABLED });
+  }
+  if (req.method === "POST" && url.pathname === "/api/auth/email/request") {
+    let email = "";
+    try {
+      if (!EMAIL_CODES_ENABLED) throw Object.assign(new Error("Email sign-in is not configured"), { status: 503 });
+      const { data } = await parseBody(req);
+      const created = auth.createEmailCode(data.email, clientIp);
+      email = created.email;
+      await sendLoginCodeEmail(created.email, created.code);
+      return json(res, 200, { ok: true });
+    } catch (err) {
+      // A code that was never delivered must not block a retry for a minute.
+      if (email && !err.status) auth.discardEmailCode(email);
+      if (!err.status) console.error("Login code email failed:", err.message);
+      return json(res, err.status || 502, { error: err.status ? err.message : "Could not send the code. Try again." });
+    }
+  }
+  if (req.method === "POST" && url.pathname === "/api/auth/email/verify") {
+    try {
+      const { data } = await parseBody(req);
+      const result = auth.verifyEmailCode(data.email, data.code);
+      if (result.isNew) tenantContext.run(tenantDb(result.account.tenant), () => createStarterCompany(result.account.name));
+      const { id: accountId, email, name } = result.account;
+      return json(res, 200, { account: { id: accountId, email, name } }, { "set-cookie": auth.sessionCookie(req, result.token) });
+    } catch (err) {
+      return json(res, err.status || 400, { error: err.status ? err.message : "Invalid request" });
+    }
   }
   if (req.method === "POST" && url.pathname === "/api/auth/google") {
     try {
