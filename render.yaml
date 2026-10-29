@@ -13,3 +13,5 @@ services:
         value: production
       - key: DEMO_MODE
         value: "false"
+      - key: GOOGLE_CLIENT_ID
+        sync: false

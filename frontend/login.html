@@ -25,6 +25,11 @@
         <h1 id="auth-title">Sign in</h1>
         <p id="auth-subtitle" class="auth-sub">Welcome back. Sign in to your workspace.</p>
 
+        <div id="google-block" class="auth-google" hidden>
+          <div id="google-button"></div>
+          <div class="auth-divider"><span>or use email</span></div>
+        </div>
+
         <form id="auth-form" novalidate>
           <label id="name-field" class="auth-field" hidden>
             <span>Your name</span>
@@ -49,5 +54,6 @@
       </section>
     </main>
     <script src="/login.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async onload="initGoogleSignIn()"></script>
   </body>
 </html>

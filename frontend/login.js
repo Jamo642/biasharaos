@@ -70,4 +70,37 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
+// Google sign-in: anyone with a Google account gets their own workspace.
+// Only shown when the server has GOOGLE_CLIENT_ID configured.
+const googleConfig = fetch("/api/auth/config", { credentials: "same-origin" })
+  .then((res) => (res.ok ? res.json() : {}))
+  .catch(() => ({}));
+
+async function handleGoogleCredential(response) {
+  showError("");
+  try {
+    const res = await fetch("/api/auth/google", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credential: response.credential })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Google sign-in failed");
+    window.location.replace("/");
+  } catch (err) {
+    showError(err.message);
+  }
+}
+
+window.initGoogleSignIn = async function initGoogleSignIn() {
+  const { googleClientId } = await googleConfig;
+  if (!googleClientId || !window.google?.accounts?.id) return;
+  google.accounts.id.initialize({ client_id: googleClientId, callback: handleGoogleCredential });
+  google.accounts.id.renderButton(document.getElementById("google-button"), {
+    theme: "outline", size: "large", text: "continue_with", shape: "rectangular", width: 320
+  });
+  document.getElementById("google-block").hidden = false;
+};
+
 loadStatus();

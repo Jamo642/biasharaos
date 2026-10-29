@@ -1,6 +1,8 @@
-// Email + password sign-in for the dashboard.
+// Email + password and Google sign-in for the dashboard.
 // Passwords are hashed with scrypt; sessions are random tokens stored (hashed)
 // in SQLite and sent to the browser as an HttpOnly cookie.
+// Google accounts each get their own workspace ("tenant"); accounts with no
+// tenant use the original shared database.
 const { randomBytes, randomUUID, scryptSync, createHash, timingSafeEqual } = require("node:crypto");
 
 const COOKIE_NAME = "bos_session";
@@ -21,6 +23,8 @@ function createAuth(db) {
       created_at TEXT NOT NULL, FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE CASCADE
     );
   `);
+  const accountColumns = db.prepare("PRAGMA table_info(accounts)").all().map((c) => c.name);
+  if (!accountColumns.includes("tenant")) db.exec("ALTER TABLE accounts ADD COLUMN tenant TEXT");
 
   const failures = new Map();
 
@@ -68,9 +72,28 @@ function createAuth(db) {
     const name = String(data.name || "").trim().slice(0, 120);
     if (!name) throw httpError(400, "Enter your name");
     const id = randomUUID();
-    db.prepare("INSERT INTO accounts VALUES (?,?,?,?,?)")
+    db.prepare("INSERT INTO accounts (id, email, name, password_hash, created_at) VALUES (?,?,?,?,?)")
       .run(id, email, name, hashPassword(password), new Date().toISOString());
     return { token: createSession(id), account: { id, email, name } };
+  }
+
+  // `claims` must already be verified as a genuine Google ID token for this app.
+  // An existing account with the same email is reused; otherwise a new account
+  // with its own empty workspace is created.
+  function googleLogin(claims) {
+    const email = String(claims.email || "").trim().toLowerCase();
+    if (!EMAIL_RE.test(email) || email.length > 254) throw httpError(400, "Google account has no usable email");
+    const existing = db.prepare("SELECT id, email, name, tenant FROM accounts WHERE email = ?").get(email);
+    if (existing) {
+      return { token: createSession(existing.id), account: { id: existing.id, email, name: existing.name, tenant: existing.tenant }, isNew: false };
+    }
+    const name = String(claims.name || email.split("@")[0]).trim().slice(0, 120);
+    const id = randomUUID();
+    const tenant = randomUUID();
+    // "google" is not a valid scrypt hash, so password sign-in stays impossible for this account.
+    db.prepare("INSERT INTO accounts (id, email, name, password_hash, created_at, tenant) VALUES (?,?,?,?,?,?)")
+      .run(id, email, name, "google", new Date().toISOString(), tenant);
+    return { token: createSession(id), account: { id, email, name, tenant }, isNew: true };
   }
 
   function login(data, ip) {
@@ -103,11 +126,11 @@ function createAuth(db) {
     const token = readToken(req);
     if (!token) return null;
     const row = db.prepare(`
-      SELECT a.id, a.email, a.name, s.expires_at FROM auth_sessions s
+      SELECT a.id, a.email, a.name, a.tenant, s.expires_at FROM auth_sessions s
       JOIN accounts a ON a.id = s.account_id WHERE s.token_hash = ?
     `).get(hashToken(token));
     if (!row || row.expires_at < Date.now()) return null;
-    return { id: row.id, email: row.email, name: row.name };
+    return { id: row.id, email: row.email, name: row.name, tenant: row.tenant };
   }
 
   function logout(req) {
@@ -121,7 +144,7 @@ function createAuth(db) {
     return `${COOKIE_NAME}=${token || ""}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${secure}`;
   }
 
-  return { accountCount, registerFirstAccount, login, logout, currentAccount, sessionCookie };
+  return { accountCount, registerFirstAccount, googleLogin, login, logout, currentAccount, sessionCookie };
 }
 
 function httpError(status, message) {

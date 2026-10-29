@@ -33,6 +33,29 @@ el("signOut")?.addEventListener("click", async () => {
   window.location.replace("/login.html");
 });
 
+function initialsOf(name) {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "BO";
+  const letters = parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2);
+  return letters.toUpperCase();
+}
+
+async function loadUserChip() {
+  try {
+    const res = await fetch("/api/auth/status", { credentials: "same-origin" });
+    if (!res.ok) return;
+    const { account } = await res.json();
+    if (!account) return;
+    const displayName = account.name || account.email;
+    el("userName").textContent = displayName;
+    el("userAvatar").textContent = initialsOf(displayName);
+    el("userChip").title = account.email ? `${displayName} · ${account.email}` : displayName;
+  } catch {
+    // Keep the default "Owner" chip if the status call fails.
+  }
+}
+loadUserChip();
+
 function activateTab(id, updateHash = true) {
   const target = el(id) ? id : "dashboard";
   document.querySelectorAll(".tabs [role=tab]").forEach((tab) => {

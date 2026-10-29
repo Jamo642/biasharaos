@@ -3,6 +3,7 @@ const { readFileSync, existsSync, mkdirSync } = require("node:fs");
 const { join, extname } = require("node:path");
 const { randomUUID, createHmac, timingSafeEqual } = require("node:crypto");
 const { DatabaseSync } = require("node:sqlite");
+const { AsyncLocalStorage } = require("node:async_hooks");
 const { createAuth } = require("./auth");
 
 // Load .env. After the frontend/backend split, .env lives at the project
@@ -36,11 +37,41 @@ const PROJECT_ROOT = join(ROOT, "..");              // repo root
 const PUBLIC = join(PROJECT_ROOT, "frontend");      // frontend/ served as static
 const DATA_DIR = join(ROOT, "data");                // backend/data/ (sqlite)
 const DB_PATH = join(DATA_DIR, "biashara.sqlite");
+const TENANT_DIR = join(DATA_DIR, "tenants");
+const TENANT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const GOOGLE_CLIENT_ID = String(process.env.GOOGLE_CLIENT_ID || "").trim();
 const DEMO_MODE = process.env.DEMO_MODE === "true";
 
 if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
-const db = new DatabaseSync(DB_PATH);
-db.exec("PRAGMA foreign_keys = ON");
+const mainDb = new DatabaseSync(DB_PATH);
+mainDb.exec("PRAGMA foreign_keys = ON");
+
+// Each Google account has its own SQLite file under data/tenants/. Requests run
+// inside tenantContext, and `db` forwards to that request's database, so every
+// query below is isolated per business without carrying a tenant filter.
+// Webhooks and the SMS scheduler have no signed-in account and use mainDb.
+const tenantContext = new AsyncLocalStorage();
+const tenantDbs = new Map();
+const db = new Proxy({}, {
+  get(_, prop) {
+    const target = tenantContext.getStore() || mainDb;
+    const value = target[prop];
+    return typeof value === "function" ? value.bind(target) : value;
+  }
+});
+
+function tenantDb(tenant) {
+  if (!TENANT_ID_RE.test(String(tenant))) throw new Error("Invalid workspace id");
+  if (tenantDbs.has(tenant)) return tenantDbs.get(tenant);
+  if (!existsSync(TENANT_DIR)) mkdirSync(TENANT_DIR, { recursive: true });
+  const tdb = new DatabaseSync(join(TENANT_DIR, `${tenant}.sqlite`));
+  tdb.exec("PRAGMA foreign_keys = ON");
+  tenantContext.run(tdb, migrate);
+  tenantDbs.set(tenant, tdb);
+  return tdb;
+}
+
+const dbForAccount = (account) => (account && account.tenant ? tenantDb(account.tenant) : mainDb);
 // Africa's Talking creates a new webhook request for every USSD turn. Keep a
 // small in-memory conversation state so option 5 can continue across turns.
 const ussdAiSessions = new Map();
@@ -1375,6 +1406,40 @@ function setupWorkspace(data = {}) {
     run("INSERT INTO inventory VALUES (:id,:company_id,'RAW_MATERIAL',:item_id,:item_name,:unit,:quantity,:reorder_level,:updated_at)", { id: id("inv"), company_id: cid, item_id: materialId, item_name: materialName, unit, quantity: Number(data.materialQuantity || 0), reorder_level: Number(data.reorderLevel || 0), updated_at: t });
   }
   return { configured: true, company: get("SELECT id, name, city FROM companies WHERE id=:id", { id: cid }) };
+}
+
+// A new Google workspace starts with just its company and owner, so the
+// dashboard has a business to attach records to.
+function createStarterCompany(ownerName) {
+  if (companyId()) return;
+  const t = now();
+  const cid = id("co");
+  const firstName = String(ownerName || "").trim().split(/\s+/)[0] || "My";
+  run("INSERT INTO companies VALUES (:id,:name,:city,:created_at)", { id: cid, name: `${firstName}'s Business`, city: "Kenya", created_at: t });
+  run("INSERT INTO users VALUES (:id,:company_id,:name,:phone,'OWNER',:created_at)", { id: id("usr"), company_id: cid, name: String(ownerName || "Owner").slice(0, 120), phone: "", created_at: t });
+}
+
+const GOOGLE_ISSUERS = new Set(["accounts.google.com", "https://accounts.google.com"]);
+
+// Asks Google to check the ID token's signature and expiry, then checks it was
+// issued for this app and carries a verified email.
+async function verifyGoogleIdToken(credential) {
+  const fail = (message) => Object.assign(new Error(message), { status: 401 });
+  if (!GOOGLE_CLIENT_ID) throw Object.assign(new Error("Google sign-in is not configured"), { status: 503 });
+  if (typeof credential !== "string" || !credential || credential.length > 4096) throw fail("Missing Google credential");
+  let res;
+  try {
+    res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`, { signal: AbortSignal.timeout(8000) });
+  } catch {
+    throw Object.assign(new Error("Could not reach Google. Try again."), { status: 502 });
+  }
+  if (!res.ok) throw fail("Google sign-in was rejected");
+  const claims = await res.json();
+  if (claims.aud !== GOOGLE_CLIENT_ID) throw fail("Google sign-in was issued for a different app");
+  if (!GOOGLE_ISSUERS.has(claims.iss)) throw fail("Google sign-in has an unexpected issuer");
+  if (Number(claims.exp) * 1000 < Date.now()) throw fail("Google sign-in has expired");
+  if (claims.email_verified !== true && claims.email_verified !== "true") throw fail("Your Google email is not verified");
+  return claims;
 }
 
 function setupWorkspaceFromAgent(data = {}) {
@@ -3448,10 +3513,22 @@ function serveStatic(req, res) {
 }
 
 async function route(req, res) {
+  let account = null;
+  let store = mainDb;
+  try {
+    account = auth.currentAccount(req);
+    store = dbForAccount(account);
+  } catch (err) {
+    console.error("Workspace lookup failed:", err.message);
+    return json(res, 500, { error: "Could not open your workspace" });
+  }
+  return tenantContext.run(store, () => handleRequest(req, res, account));
+}
+
+async function handleRequest(req, res, account) {
   try {
     if (!rateLimit(req)) return json(res, 429, { error: "Rate limit exceeded" });
     const url = new URL(req.url, `http://${req.headers.host}`);
-    const account = auth.currentAccount(req);
     if (!url.pathname.startsWith("/api/")) {
       // The dashboard itself needs a signed-in account; assets and the sign-in page do not.
       const isDashboard = url.pathname === "/" || url.pathname === "/index.html";
@@ -3729,7 +3806,23 @@ async function route(req, res) {
 async function authRoute(req, res, url, account) {
   const clientIp = req.socket.remoteAddress || "local";
   if (req.method === "GET" && url.pathname === "/api/auth/status") {
-    return json(res, 200, { authenticated: Boolean(account), account, needsSetup: auth.accountCount() === 0 });
+    const publicAccount = account ? { id: account.id, email: account.email, name: account.name } : null;
+    return json(res, 200, { authenticated: Boolean(account), account: publicAccount, needsSetup: auth.accountCount() === 0 });
+  }
+  if (req.method === "GET" && url.pathname === "/api/auth/config") {
+    return json(res, 200, { googleClientId: GOOGLE_CLIENT_ID || null });
+  }
+  if (req.method === "POST" && url.pathname === "/api/auth/google") {
+    try {
+      const { data } = await parseBody(req);
+      const claims = await verifyGoogleIdToken(data.credential);
+      const result = auth.googleLogin(claims);
+      if (result.isNew) tenantContext.run(tenantDb(result.account.tenant), () => createStarterCompany(result.account.name));
+      const { id: accountId, email, name } = result.account;
+      return json(res, 200, { account: { id: accountId, email, name } }, { "set-cookie": auth.sessionCookie(req, result.token) });
+    } catch (err) {
+      return json(res, err.status || 400, { error: err.status ? err.message : "Google sign-in failed" });
+    }
   }
   if (req.method === "POST" && url.pathname === "/api/auth/logout") {
     auth.logout(req);
@@ -3748,7 +3841,7 @@ async function authRoute(req, res, url, account) {
 }
 
 migrate();
-const auth = createAuth(db);
+const auth = createAuth(mainDb);
 if (DEMO_MODE) seed();
 http.createServer(route).listen(PORT, () => {
   console.log(`Biashara OS running on http://localhost:${PORT}`);
