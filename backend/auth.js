@@ -34,6 +34,8 @@ function createAuth(db) {
   `);
   const accountColumns = db.prepare("PRAGMA table_info(accounts)").all().map((c) => c.name);
   if (!accountColumns.includes("tenant")) db.exec("ALTER TABLE accounts ADD COLUMN tenant TEXT");
+  const codeColumns = db.prepare("PRAGMA table_info(email_codes)").all().map((c) => c.name);
+  if (!codeColumns.includes("name")) db.exec("ALTER TABLE email_codes ADD COLUMN name TEXT");
 
   const failures = new Map();
   const codeRequests = new Map();
@@ -115,19 +117,25 @@ function createAuth(db) {
 
   // Creates a 6-digit sign-in code for `email` and returns it so the caller can
   // email it. Only a hash is stored. Limited per email (one per minute) and per IP.
-  function createEmailCode(rawEmail, ip) {
+  // `name` is kept for naming a new account. With `reuseRecent`, a code sent
+  // within the last minute is kept and `code` comes back null (nothing to send).
+  function createEmailCode(rawEmail, ip, { name = null, reuseRecent = false } = {}) {
     const email = String(rawEmail || "").trim().toLowerCase();
     if (!EMAIL_RE.test(email) || email.length > 254) throw httpError(400, "Enter a valid email address");
     const nowMs = Date.now();
-    const recent = db.prepare("SELECT sent_at FROM email_codes WHERE email = ?").get(email);
-    if (recent && nowMs - recent.sent_at < CODE_RESEND_MS) throw httpError(429, "A code was just sent. Wait a minute before asking again.");
+    const recent = db.prepare("SELECT sent_at, expires_at FROM email_codes WHERE email = ?").get(email);
+    if (recent && nowMs - recent.sent_at < CODE_RESEND_MS) {
+      if (reuseRecent && recent.expires_at > nowMs) return { email, code: null };
+      throw httpError(429, "A code was just sent. Wait a minute before asking again.");
+    }
     const bucket = codeRequests.get(ip);
     const current = bucket && bucket.reset > nowMs ? bucket : { count: 0, reset: nowMs + CODE_IP_WINDOW_MS };
     if (current.count >= CODE_IP_MAX) throw httpError(429, "Too many code requests. Try again later.");
     codeRequests.set(ip, { ...current, count: current.count + 1 });
     const code = String(randomInt(0, 1000000)).padStart(6, "0");
     db.prepare("DELETE FROM email_codes WHERE expires_at < ?").run(nowMs);
-    db.prepare("INSERT OR REPLACE INTO email_codes VALUES (?,?,?,0,?)").run(email, codeHash(email, code), nowMs + CODE_TTL_MS, nowMs);
+    db.prepare("INSERT OR REPLACE INTO email_codes (email, code_hash, expires_at, attempts, sent_at, name) VALUES (?,?,?,0,?,?)")
+      .run(email, codeHash(email, code), nowMs + CODE_TTL_MS, nowMs, name ? String(name).slice(0, 120) : null);
     return { email, code };
   }
 
@@ -151,7 +159,7 @@ function createAuth(db) {
       throw httpError(401, "Wrong code. Check the email and try again.");
     }
     discardEmailCode(email);
-    return loginVerifiedEmail(email, null, "email-code");
+    return loginVerifiedEmail(email, row.name, "email-code");
   }
 
   function login(data, ip) {

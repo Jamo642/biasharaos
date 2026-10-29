@@ -3870,6 +3870,21 @@ async function authRoute(req, res, url, account) {
     try {
       const { data } = await parseBody(req);
       const claims = await verifyGoogleIdToken(data.credential);
+      // When email can be sent, Google sign-in also needs the emailed code:
+      // send it here and let the browser finish through /api/auth/email/verify.
+      if (EMAIL_CODES_ENABLED) {
+        const created = auth.createEmailCode(claims.email, clientIp, { name: claims.name, reuseRecent: true });
+        if (created.code) {
+          try {
+            await sendLoginCodeEmail(created.email, created.code);
+          } catch (sendErr) {
+            auth.discardEmailCode(created.email);
+            console.error("Login code email failed:", sendErr.message);
+            return json(res, 502, { error: "Could not send the code. Try again." });
+          }
+        }
+        return json(res, 200, { codeSent: true, email: created.email });
+      }
       const result = auth.googleLogin(claims);
       if (result.isNew) tenantContext.run(tenantDb(result.account.tenant), () => createStarterCompany(result.account.name));
       const { id: accountId, email, name } = result.account;

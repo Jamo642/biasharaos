@@ -97,7 +97,11 @@ async function handleGoogleCredential(response) {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || "Google sign-in failed");
-    window.location.replace("/");
+    if (!data.codeSent) return window.location.replace("/");
+    // Google confirmed the account; now the emailed code finishes sign-in.
+    showPasswordForm(false);
+    codeEmail.value = data.email;
+    showCodeStep(true);
   } catch (err) {
     showError(err.message);
   }
