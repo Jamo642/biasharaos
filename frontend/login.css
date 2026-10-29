@@ -111,3 +111,6 @@ h1 { margin: 0 0 6px; font-size: 22px; font-weight: 700; }
 }
 .auth-link:hover { text-decoration: underline; }
 #code { letter-spacing: 6px; font-size: 18px; font-weight: 600; }
+
+/* Classes above set display, which would otherwise override the hidden attribute. */
+[hidden] { display: none !important; }

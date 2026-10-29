@@ -9,11 +9,21 @@ function showError(message) {
   errorBox.hidden = !message;
 }
 
-// With no account yet, the page becomes "create owner account".
+const authTitle = document.getElementById("auth-title");
+const authSubtitle = document.getElementById("auth-subtitle");
+const SIGN_IN_TEXT = { title: "Sign in", subtitle: "Welcome back. Sign in to your workspace." };
+const SETUP_TEXT = { title: "Create owner account", subtitle: "First time here. Create the account that will manage this workspace." };
+
+function setHeading({ title, subtitle }) {
+  authTitle.textContent = title;
+  authSubtitle.textContent = subtitle;
+}
+
+// With no account yet, the password form becomes "create owner account".
+// The heading only changes while that form is on screen.
 function useSetupMode() {
   mode = "register";
-  document.getElementById("auth-title").textContent = "Create owner account";
-  document.getElementById("auth-subtitle").textContent = "First time here. Create the account that will manage this workspace.";
+  if (!form.hidden) setHeading(SETUP_TEXT);
   document.getElementById("name-field").hidden = false;
   passwordInput.autocomplete = "new-password";
   submit.textContent = "Create account";
@@ -128,6 +138,7 @@ function showCodeStep(sent) {
 
 function showPasswordForm(usePassword) {
   form.hidden = !usePassword;
+  setHeading(usePassword && mode === "register" ? SETUP_TEXT : SIGN_IN_TEXT);
   codeForm.hidden = usePassword;
   switchMode.textContent = usePassword ? "Email me a code instead" : "Use password instead";
   showError("");
