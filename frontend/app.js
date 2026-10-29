@@ -2076,7 +2076,7 @@ el("aiForm").addEventListener("submit", async (event) => {
   el("aiInput").value = "";
   try {
     log.insertAdjacentHTML("beforeend", `<div class="bubble user">${escapeHtml(message)}</div>`);
-    log.insertAdjacentHTML("beforeend", `<div class="bubble pending agent-progress"><strong>Biashara agent</strong><span>Interpreting your request</span><span>Validating business data</span><span>Recording the action</span><span>Updating dashboard</span></div>`);
+    log.insertAdjacentHTML("beforeend", `<div class="bubble pending">Thinking…</div>`);
     log.scrollTop = log.scrollHeight;
     const result = await api("/api/ai/message", { method: "POST", body: { message, language, channel: "WEB", phone: "+254700000001" } });
     // Remove the pending bubble

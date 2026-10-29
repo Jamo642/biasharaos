@@ -262,6 +262,9 @@ function migrate() {
       paid INTEGER NOT NULL DEFAULT 0, paid_at TEXT, source TEXT NOT NULL, created_at TEXT NOT NULL,
       FOREIGN KEY(company_id) REFERENCES companies(id)
     );
+    CREATE TABLE IF NOT EXISTS ai_usage (
+      day TEXT PRIMARY KEY, count INTEGER NOT NULL
+    );
   `);
   // Schema migrations for existing databases
   addColumnIfMissing("sales_transactions", "customer_id", "TEXT");
@@ -1828,11 +1831,10 @@ function activeAiProvider() {
   return "local";
 }
 
+// Free models tried in order when the configured one fails (both support tool calls).
 const OPENROUTER_FREE_FALLBACK_MODELS = [
-  "nvidia/nemotron-3-ultra-550b-a55b:free",
   "google/gemma-4-31b-it:free",
-  "nvidia/nemotron-3-nano-30b-a3b:free",
-  "qwen/qwen3-14b:free"
+  "nvidia/nemotron-3-ultra-550b-a55b:free"
 ];
 
 function openRouterModels() {
@@ -2016,15 +2018,40 @@ const AGENT_TOOLS = [
 async function callToolModel(provider, messages, timeoutMs = 20_000) {
   const isNvidia = provider === "nvidia";
   const endpoint = isNvidia ? "https://integrate.api.nvidia.com/v1/chat/completions" : "https://openrouter.ai/api/v1/chat/completions";
-  const model = isNvidia ? nvidiaModel() : openRouterModels()[0];
+  const models = isNvidia ? [nvidiaModel()] : openRouterModels();
   const headers = { Authorization: `Bearer ${isNvidia ? process.env.NVIDIA_API_KEY || process.env.AI_API_KEY : process.env.OPENROUTER_API_KEY}`, "Content-Type": "application/json" };
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  const res = await fetch(endpoint, { method: "POST", signal: controller.signal, headers, body: JSON.stringify({ model, temperature: 0.1, max_tokens: 1200, messages, tools: AGENT_TOOLS, tool_choice: "auto" }) });
-  clearTimeout(timer);
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(payload?.error?.message || `AI tool request failed (${res.status})`);
-  return { message: payload.choices?.[0]?.message, model: payload.model || model, provider };
+  let lastError = null;
+  // Free models are often rate-limited upstream, so fall through to the next one.
+  for (const model of models) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(endpoint, { method: "POST", signal: controller.signal, headers, body: JSON.stringify({ model, temperature: 0.1, max_tokens: 1200, messages, tools: AGENT_TOOLS, tool_choice: "auto" }) });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload?.error?.message || `AI tool request failed (${res.status})`);
+      return { message: payload.choices?.[0]?.message, model: payload.model || model, provider };
+    } catch (err) {
+      lastError = err;
+      console.error(`${model} tool request failed:`, err.message);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw lastError;
+}
+
+// Each signed-in account gets AI_DAILY_LIMIT AI requests per Kenyan calendar day
+// (EAT, UTC+3). The count lives in the account's own database so it survives restarts.
+const AI_DAILY_LIMIT = Number(process.env.AI_DAILY_LIMIT) || 5;
+const AI_LIMIT_MESSAGE = `You have used all ${AI_DAILY_LIMIT} AI requests for today. Please wait until tomorrow to use the AI assistant again.`;
+const kenyaDay = () => new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10);
+
+function takeAiAllowance() {
+  const day = kenyaDay();
+  const used = get("SELECT count FROM ai_usage WHERE day = :day", { day })?.count || 0;
+  if (used >= AI_DAILY_LIMIT) return false;
+  run("INSERT INTO ai_usage (day, count) VALUES (:day, 1) ON CONFLICT(day) DO UPDATE SET count = count + 1", { day });
+  return true;
 }
 
 // Build a rich, Jua Kali-aware system prompt that primes the model with today's
@@ -3620,7 +3647,10 @@ async function handleRequest(req, res, account) {
     // so skip the signature check for AT paths and only apply it to non-AT webhooks.
     const isAtWebhook = url.pathname.startsWith("/api/webhooks/africastalking/");
     if (url.pathname.includes("/webhooks/") && !isAtWebhook && !verifyWebhook(req, raw)) return json(res, 401, { error: "Invalid webhook signature" });
-    if (req.method === "POST" && url.pathname === "/api/ai/message") return json(res, 200, await handleAiMessage(data));
+    if (req.method === "POST" && url.pathname === "/api/ai/message") {
+      if (!takeAiAllowance()) return json(res, 429, { error: AI_LIMIT_MESSAGE });
+      return json(res, 200, await handleAiMessage(data));
+    }
     if (req.method === "POST" && url.pathname === "/api/ai/test") return json(res, 200, await testAiProvider());
     if (req.method === "POST" && url.pathname === "/api/webhooks/africastalking/sms") {
       const result = await handleAiMessage({ message: data.text || data.message, channel: "SMS", phone: data.from || data.phoneNumber || "+254700000004" });
@@ -3860,6 +3890,7 @@ async function handleRequest(req, res, account) {
     }
     // ========== RECEIPT OCR ==========
     if (req.method === "POST" && url.pathname === "/api/ai/receipt") {
+      if (!takeAiAllowance()) return json(res, 429, { error: AI_LIMIT_MESSAGE });
       const result = await extractReceiptFromImage(data);
       return json(res, result?.error ? 400 : 200, result);
     }
