@@ -1939,7 +1939,7 @@ function render() {
       ${receipt
         ? `<div class="bubble action-complete"><strong>Action completed</strong><span>${escapeHtml(receipt)}</span><small>Validated and saved to the database</small></div>`
         : `<div class="bubble">${escapeHtml(a.response || "")}</div>`}`;
-    }).join("") || `<div class="bubble">Welcome to Biashara OS. Try: "Nimenunua chuma kilo 100 kwa 30,000" or "How much profit did I make this week?"</div>`;
+    }).join("") || `<div class="bubble">Welcome to Biashara OS. Try: "Nimenunua chuma kilo 100 kwa 30,000" or "How much profit did I make this week?"${(data.inventory || []).length ? "" : `<form class="chat-action-form" data-endpoint="/api/inventory" data-submit-label="Add stock"><strong>Add your first stock item</strong><label>Type<select name="type" required><option value="material">Material</option><option value="product">Product</option></select></label><label>Name<input name="name" required></label><label>Unit<input name="unit" value="kg" required></label><label>Quantity<input name="quantity" type="number" min="0" value="0" required></label><label>Reorder level<input name="reorderLevel" type="number" min="0" value="0" required></label><button type="submit">Add stock</button></form>`}</div>`;
   }
 
 
@@ -2087,7 +2087,10 @@ el("aiForm").addEventListener("submit", async (event) => {
     const pending = log.querySelector(".pending");
     if (pending) pending.remove();
     await refresh();
-    log.insertAdjacentHTML("beforeend", `<div class="bubble">${escapeHtml(result.response)}</div>`);
+    const formHtml = result.form && ["/api/purchases", "/api/sales", "/api/expenses", "/api/inventory"].includes(result.form.endpoint)
+      ? `<form class="chat-action-form" data-endpoint="${escapeHtml(result.form.endpoint)}" data-submit-label="${escapeHtml(result.form.submitLabel || "Save")}"><strong>${escapeHtml(result.form.title || "Complete this action")}</strong>${(result.form.fields || []).map((field) => `<label>${escapeHtml(field.label)}${field.type === "select" ? `<select name="${escapeHtml(field.name)}" ${field.required ? "required" : ""}>${(field.options || []).map(option => `<option value="${escapeHtml(option)}" ${String(option) === String(field.value) ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select>` : `<input name="${escapeHtml(field.name)}" type="${field.type === "number" ? "number" : "text"}" value="${escapeHtml(field.value ?? "")}" ${field.type === "number" ? 'step="any"' : ""} ${field.required ? "required" : ""}>`}</label>`).join("")}<button type="submit">${escapeHtml(result.form.submitLabel || "Save")}</button></form>`
+      : "";
+    log.insertAdjacentHTML("beforeend", `<div class="bubble">${escapeHtml(result.response)}${formHtml}</div>`);
     log.scrollTop = log.scrollHeight;
   } catch (err) {
     const pending = log.querySelector(".pending");
@@ -2095,6 +2098,24 @@ el("aiForm").addEventListener("submit", async (event) => {
     await refresh().catch(() => {});
     log.insertAdjacentHTML("beforeend", `<div class="bubble">${escapeHtml(err.message)}</div>`);
     log.scrollTop = log.scrollHeight;
+  }
+});
+
+el("chatLog")?.addEventListener("submit", async (event) => {
+  const form = event.target.closest(".chat-action-form");
+  if (!form) return;
+  event.preventDefault();
+  const bubble = form.closest(".bubble");
+  el("chatLog").dataset.hasMessages = "true";
+  const endpoint = form.dataset.endpoint;
+  try {
+    const values = Object.fromEntries(new FormData(form));
+    for (const input of form.querySelectorAll('input[type="number"]')) values[input.name] = Number(values[input.name]);
+    await api(endpoint, { method: "POST", body: values });
+    bubble.textContent = "Saved.";
+    await refresh();
+  } catch (err) {
+    form.insertAdjacentHTML("beforeend", `<span class="form-error">${escapeHtml(err.message)}</span>`);
   }
 });
 

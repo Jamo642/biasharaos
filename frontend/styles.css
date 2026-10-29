@@ -666,6 +666,20 @@ form.form-compact button {
   gap: 8px;
 }
 
+.chat-action-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg);
+}
+.chat-action-form label { display: grid; gap: 4px; color: var(--text-muted); font-size: 12px; }
+.chat-action-form input, .chat-action-form select { min-height: 36px; padding: 0 9px; border: 1px solid var(--border); border-radius: var(--r-sm); background: #fff; color: var(--text); }
+.chat-action-form button { justify-self: start; min-height: 36px; padding: 0 14px; }
+.form-error { color: var(--red, #c0392b); font-size: 12px; }
+
 #aiLanguage {
   min-height: 42px;
   padding: 0 10px;

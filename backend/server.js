@@ -1314,21 +1314,22 @@ function recordPurchase({ supplierName, itemName, quantity, unit = "kg", totalCo
   }
   // Add to inventory
   const inv = findInventoryItem(itemName);
-  if (!inv) throw new Error(`Inventory item not found: ${itemName}. Configure it as a material first.`);
-  addInventory({ itemName: inv.item_name, quantity: Number(quantity), source, userId, note: originalMessage || `Purchased from ${resolvedSupplierName || 'supplier'}` });
+  if (!inv) configureRecord({ target: "material", name: itemName, unit, quantity: 0, source, userId, originalMessage });
+  const currentInv = inv || findInventoryItem(itemName);
+  addInventory({ itemName: currentInv.item_name, quantity: Number(quantity), source, userId, note: originalMessage || `Purchased from ${resolvedSupplierName || 'supplier'}` });
   // Record purchase
   const purchaseId = id("pur");
   run("INSERT INTO purchases VALUES (:id,:company_id,:supplier_id,:supplier_name,:item_name,:quantity,:unit,:total_cost,:payment_status,:source,:user_id,:original_message,:created_at)", {
     id: purchaseId, company_id: companyId(), supplier_id: supplierId, supplier_name: resolvedSupplierName,
-    item_name: inv.item_name, quantity: Number(quantity), unit: inv.unit || unit, total_cost: Number(totalCost),
+    item_name: currentInv.item_name, quantity: Number(quantity), unit: currentInv.unit || unit, total_cost: Number(totalCost),
     payment_status: paymentStatus, source, user_id: userId, original_message: originalMessage || null, created_at: now()
   });
   // Create supplier debt if on credit
   if (paymentStatus === "CREDIT" && supplierId) {
     createSupplierDebt({ supplierId, purchaseId, amountOwed: Number(totalCost), source });
   }
-  audit({ actorUserId: userId, action: "recordPurchase", entityType: "purchase", entityId: purchaseId, after: { itemName: inv.item_name, quantity, totalCost, supplier: resolvedSupplierName }, source });
-  return { purchaseId, itemName: inv.item_name, quantity: Number(quantity), unit: inv.unit || unit, totalCost: Number(totalCost), supplier: resolvedSupplierName, paymentStatus };
+  audit({ actorUserId: userId, action: "recordPurchase", entityType: "purchase", entityId: purchaseId, after: { itemName: currentInv.item_name, quantity, totalCost, supplier: resolvedSupplierName }, source });
+  return { purchaseId, itemName: currentInv.item_name, quantity: Number(quantity), unit: currentInv.unit || unit, totalCost: Number(totalCost), supplier: resolvedSupplierName, paymentStatus };
 }
 
 function listPurchases(period = "all") {
@@ -2222,6 +2223,7 @@ async function runToolAgent(message, language, userId, channel, aiTimeoutMs = 20
     try {
       const messages = [{ role: "system", content: system }, { role: "user", content: String(message || "").slice(0, 4000) }];
       const applied = [];
+      let form = null;
       let answer = await callToolModel(provider, messages, aiTimeoutMs);
       // Multi-round tool loop: let the model chain lookups and writes until it
       // produces a final text answer or we hit the safety cap.
@@ -2232,6 +2234,42 @@ async function runToolAgent(message, language, userId, channel, aiTimeoutMs = 20
         for (const call of toolCalls) {
           const result = await runToolCall(call, { message, channel, userId });
           applied.push({ name: call.function.name, result });
+          if (result?.error) {
+            let input = {};
+            try { input = JSON.parse(call.function.arguments || "{}"); } catch {}
+            const tool = call.function.name;
+            const error = result.error;
+            const missingInventory = tool === "record_sale" && /not found|not configured/i.test(error);
+            const fixable = /required|positive number|greater than zero/i.test(error);
+            const fields = tool === "record_purchase" ? [
+              { name: "item", label: "Item", type: "text", value: input.item || "", required: true },
+              { name: "quantity", label: "Quantity", type: "number", value: input.quantity ?? "", required: true },
+              { name: "unit", label: "Unit", type: "text", value: input.unit || "kg", required: true },
+              { name: "totalCost", label: "Total cost", type: "number", value: input.total_cost ?? input.totalCost ?? "", required: true },
+              { name: "supplier", label: "Supplier", type: "text", value: input.supplier || "", required: false },
+              { name: "paymentStatus", label: "Payment status", type: "select", value: input.payment_status || "PAID", required: true, options: ["PAID", "CREDIT"] }
+            ] : tool === "record_sale" ? [
+              { name: "product", label: "Product", type: "text", value: input.item || "", required: true },
+              { name: "quantity", label: "Quantity", type: "number", value: input.quantity ?? "", required: true },
+              { name: "unit", label: "Unit", type: "text", value: input.unit || "units", required: true },
+              { name: "amount", label: "Amount", type: "number", value: input.amount ?? "", required: true },
+              { name: "customer", label: "Customer", type: "text", value: input.customer || "", required: false },
+              { name: "paymentStatus", label: "Payment status", type: "select", value: input.payment_status || "PAID", required: true, options: ["PAID", "CREDIT"] }
+            ] : [
+              { name: "category", label: "Category", type: "text", value: input.category || "OTHER", required: true },
+              { name: "description", label: "Description", type: "text", value: input.description || "", required: true },
+              { name: "amount", label: "Amount", type: "number", value: input.amount ?? "", required: true }
+            ];
+            if (missingInventory) form = { title: "Add this product first", endpoint: "/api/inventory", submitLabel: "Add product", fields: [
+              { name: "type", label: "Type", type: "select", value: "product", required: true, options: ["product", "material"] },
+              { name: "name", label: "Product name", type: "text", value: input.item || "", required: true },
+              { name: "unit", label: "Unit", type: "text", value: input.unit || "units", required: true },
+              { name: "quantity", label: "Opening stock", type: "number", value: 0, required: true },
+              { name: "reorderLevel", label: "Reorder level", type: "number", value: 0, required: true },
+              { name: "supplier", label: "Supplier", type: "text", value: "", required: false }
+            ] };
+            else if (fixable && ["record_purchase", "record_sale", "record_expense"].includes(tool)) form = { title: "Complete this action", endpoint: tool === "record_purchase" ? "/api/purchases" : tool === "record_sale" ? "/api/sales" : "/api/expenses", submitLabel: "Save", fields };
+          }
           messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result).slice(0, 4000) });
         }
         answer = await callToolModel(provider, messages, aiTimeoutMs);
@@ -2242,11 +2280,20 @@ async function runToolAgent(message, language, userId, channel, aiTimeoutMs = 20
         messages.push({ role: "user", content: "Using the tool results above, now answer my original message directly. Do not call any more tools." });
         answer = await callToolModel(provider, messages, aiTimeoutMs, false).catch(() => answer);
       }
-      const text = answer.message?.content || (applied.length ? applied.map(a => a.result?.error ? `${a.name}: ${a.result.error}` : `✓ ${a.name}`).join("; ") : "");
+      // Only lookups ran and no reply was written: nothing was saved, so let the
+      // built-in parser answer (it lists stock, debts, etc.) instead of a vague fallback.
+      if (!answer.message?.content && !form && applied.length && applied.every(a => /^(get|list)_/.test(a.name))) return null;
+      const kiswahili = /(nime|nina|ngapi|leo|kwa|bei)/i.test(String(message || ""));
+      const successful = applied.find(a => a.result && !a.result.error)?.result;
+      const text = answer.message?.content || (form ? (kiswahili ? "Jaza fomu hapa chini ili kukamilisha." : "Please fill in the form below to finish.") : successful?.purchaseId
+        ? (kiswahili ? `Ununuzi umerekodiwa: ${successful.quantity} ${successful.unit} ${successful.itemName} kwa KSh ${Number(successful.totalCost).toLocaleString()}.` : `Purchase recorded: ${successful.quantity} ${successful.unit} ${successful.itemName} for KSh ${Number(successful.totalCost).toLocaleString()}.`)
+        : successful ? (kiswahili ? "Taarifa imehifadhiwa." : "The action was saved.")
+          : applied.length ? (kiswahili ? "Hatukuweza kukamilisha ombi. Tafadhali angalia taarifa ulizotoa." : "I couldn't complete that action. Please check the details and try again.") : "");
       // If the provider produced nothing AND no tool was called, try the next one.
       if (!text && !applied.length) continue;
       return {
         response: String(text || "(no response)"),
+        ...(form ? { form } : {}),
         structured: applied.length ? { intent: applied[0].name, tool: applied[0].name, chain: applied.map(a => a.name) } : { intent: "answer" },
         result: applied.length ? applied[applied.length - 1].result : null,
         allApplied: applied,
@@ -2547,10 +2594,17 @@ async function handleAiMessage({ message, language = "English", channel = "WEB",
     result = createDowntime({ machineName: structured.machine, source: channel, userId: user?.id, originalMessage: message, structured });
     response = `Recorded: ${result.machine} is DOWN. SMS sent to ${result.technician}. Voice escalation is ready if not acknowledged.`;
   } else if (structured.intent === "inventory_query") {
-    const inv = get("SELECT * FROM inventory WHERE item_name = :item", { item: structured.item });
-    response = inv
-      ? `${inv.item_name}: ${inv.quantity}${inv.unit} in stock. Reorder level: ${inv.reorder_level}${inv.unit}.`
-      : `${structured.item} is not configured in inventory yet.`;
+    if (!String(structured.item || "").trim()) {
+      const items = all("SELECT item_name, quantity, unit, reorder_level FROM inventory ORDER BY item_type, item_name");
+      response = items.length
+        ? items.map(i => `${i.item_name}: ${i.quantity} ${i.unit}${Number(i.quantity) <= Number(i.reorder_level) ? " (LOW)" : ""}`).join("\n")
+        : "No stock records yet.";
+    } else {
+      const inv = get("SELECT * FROM inventory WHERE item_name = :item", { item: structured.item });
+      response = inv
+        ? `${inv.item_name}: ${inv.quantity}${inv.unit} in stock. Reorder level: ${inv.reorder_level}${inv.unit}.`
+        : `${structured.item} is not configured in inventory yet.`;
+    }
   } else if (structured.intent === "business_summary") {
     result = getBusinessSummary();
     response = `This week you produced ${result.unitsProduced} units and completed ${result.completedOrders} orders. Revenue was KSh ${result.revenue.toLocaleString()}. Steel consumption was ${result.steelConsumed}kg. Machine downtime is ${result.downtimeHours} hours. Biggest issue: ${result.biggestIssue}. Recommendation: ${result.recommendation}`;
@@ -3289,6 +3343,47 @@ function isTopLevelMenuInput(text) {
   return /^\d$/.test(String(text || "").trim());
 }
 
+function ussdSaleFlow(parts, sessionKey, flow) {
+  if (parts.length === 1) {
+    // Only items with stock can be sold; listing empty ones just leads to a stock error.
+    const items = all("SELECT item_name FROM inventory WHERE company_id=:cid AND quantity > 0 ORDER BY CASE item_type WHEN 'FINISHED_GOOD' THEN 0 WHEN 'WIP' THEN 1 ELSE 2 END, item_name LIMIT 8", { cid: companyId() });
+    if (!items.length) return "END Nothing in stock to sell yet. Record a purchase (menu 2) or production (menu 3) first.";
+    flow = { menu: "1", startedAt: Date.now(), inventory: items.map(i => i.item_name) };
+    ussdSessions.set(sessionKey, flow);
+    return `CON Choose item:\n${flow.inventory.map((name, i) => `${i + 1}. ${name}`).join("\n")}\n0. Other item`;
+  }
+  if (!flow) return "CON Sale session expired. Dial 1 to start again.";
+  const choice = Number(parts[1]);
+  const other = choice === 0;
+  let product = other ? parts[2] : flow.inventory?.[choice - 1];
+  if (other && parts.length === 2) return "CON Enter item name:";
+  if (!product) return "CON Invalid choice. Dial 1 to try again.";
+  const known = Boolean(findInventoryItem(product));
+  let offset = other ? 1 : 0;
+  let addItem = false;
+  if (!known) {
+    const actionIndex = 2 + offset;
+    if (parts.length === actionIndex) return `CON ${truncateForChannel(product, 65)} is not in stock.\n1. Add it and record sale\n2. Cancel`;
+    if (parts[actionIndex] === "2") { ussdSessions.delete(sessionKey); return "END Operation cancelled."; }
+    if (parts[actionIndex] !== "1") return "CON Choose 1 to add, or 2 to cancel.";
+    addItem = true;
+    offset += 1;
+  }
+  const qtyIndex = 2 + offset;
+  if (parts.length === qtyIndex) return "CON Enter quantity sold:";
+  if (parts.length === qtyIndex + 1) return "CON Enter sale amount (KSh):";
+  if (parts.length === qtyIndex + 2) return "CON Enter customer name (or 0 to skip):";
+  const qty = parts[qtyIndex], amount = parts[qtyIndex + 1], customer = parts[qtyIndex + 2];
+  ussdSessions.delete(sessionKey);
+  try {
+    const r = withTransaction(() => {
+      if (addItem) configureRecord({ target: "product", name: product, unit: "units", quantity: Number(qty), source: "USSD" });
+      return createSale({ itemName: product, quantity: Number(qty), amount: Number(amount), customer: customer !== "0" ? customer : null, paymentStatus: "PAID", source: "USSD", userId: null });
+    });
+    return `END Sale recorded: ${r.quantity} ${r.unit} of ${r.itemName} for KSh ${Number(r.amount).toLocaleString()}${r.customer ? ` to ${r.customer}` : ""}. Stock: ${r.remaining}.`;
+  } catch (err) { return `END Sale error: ${truncateForChannel(err.message, 140)}`; }
+}
+
 async function ussdResponse(text, phone, sessionId, aiTimeoutMs = Math.max(3_000, USSD_RESPONSE_TIMEOUT_MS - 2_000)) {
   const parts = String(text || "").split("*").filter(Boolean);
   const sessionKey = String(sessionId || phone || "unknown");
@@ -3338,21 +3433,13 @@ async function ussdResponse(text, phone, sessionId, aiTimeoutMs = Math.max(3_000
   if (activeFlow && Date.now() - activeFlow.startedAt > 5 * 60 * 1000) {
     ussdSessions.delete(sessionKey);
   } else if (activeFlow && parts[0] === activeFlow.menu) {
-    if (parts[1] === "0") {
+    if (parts[1] === "0" && activeFlow.menu !== "1") {
       ussdSessions.delete(sessionKey);
       return "END Operation cancelled.";
     }
     // ── Menu 1: Record Sale ──
     if (activeFlow.menu === "1") {
-      if (parts.length === 2) return "CON Enter quantity sold:";
-      if (parts.length === 3) return "CON Enter sale amount (KSh):";
-      if (parts.length === 4) return "CON Enter customer name (or 0 to skip):";
-      const [, product, qty, amount, customer] = parts;
-      ussdSessions.delete(sessionKey);
-      try {
-        const r = withTransaction(() => createSale({ itemName: product, quantity: Number(qty), amount: Number(amount), customer: customer !== "0" ? customer : null, paymentStatus: "PAID", source: "USSD", userId: null }));
-        return `END Sale recorded: ${r.quantity} ${r.unit} of ${r.itemName} for KSh ${Number(r.amount).toLocaleString()}${r.customer ? ` to ${r.customer}` : ""}. Stock: ${r.remaining}.`;
-      } catch (err) { return `END Sale error: ${truncateForChannel(err.message, 220)}`; }
+      return ussdSaleFlow(parts, sessionKey, activeFlow);
     }
     // ── Menu 2: Record Purchase ──
     if (activeFlow.menu === "2") {
@@ -3401,18 +3488,8 @@ async function ussdResponse(text, phone, sessionId, aiTimeoutMs = Math.max(3_000
   }
 
   // ── Option 1: Record Sale (guided) ────────────────────────────────────────
-  if (parts[0] === "1") {
-    ussdSessions.set(sessionKey, { menu: "1", startedAt: Date.now() });
-    if (parts.length === 1) return "CON Record Sale\nEnter product name (e.g. Steel Gate):";
-    if (parts.length === 2) return "CON Enter quantity sold:";
-    if (parts.length === 3) return "CON Enter sale amount (KSh):";
-    if (parts.length === 4) return "CON Enter customer name (or 0 to skip):";
-    const [, product, qty, amount, customer] = parts;
-    ussdSessions.delete(sessionKey);
-    try {
-      const r = withTransaction(() => createSale({ itemName: product, quantity: Number(qty), amount: Number(amount), customer: customer !== "0" ? customer : null, paymentStatus: "PAID", source: "USSD", userId: null }));
-      return `END Sale recorded: ${r.quantity} ${r.unit} of ${r.itemName} for KSh ${Number(r.amount).toLocaleString()}${r.customer ? ` to ${r.customer}` : ""}. Stock: ${r.remaining}.`;
-    } catch (err) { return `END Sale error: ${truncateForChannel(err.message, 220)}`; }
+    if (parts[0] === "1") {
+    return ussdSaleFlow(parts, sessionKey, ussdSessions.get(sessionKey));
   }
 
   // ── Option 2: Record Purchase (guided) ────────────────────────────────────
@@ -4081,6 +4158,22 @@ if (DEMO_MODE) seed();
 http.createServer(route).listen(PORT, () => {
   console.log(`Biashara OS running on http://localhost:${PORT}${cloud.enabled ? " (Supabase backup on)" : ""}`);
 });
+
+if (process.env.RENDER_EXTERNAL_URL && process.env.KEEP_ALIVE !== "false") {
+  const keepAlive = async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+    try {
+      const response = await fetch(`${process.env.RENDER_EXTERNAL_URL}/login.html`, { signal: controller.signal });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    } catch (error) {
+      console.error("Render keep-alive request failed:", error.message);
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+  setInterval(keepAlive, 10 * 60 * 1000).unref();
+}
 
 // Render stops the instance with SIGTERM: upload anything still pending first.
 for (const signal of ["SIGTERM", "SIGINT"]) {
