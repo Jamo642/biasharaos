@@ -1857,10 +1857,23 @@ function aiBusinessContext() {
   };
 }
 
-function languageInstruction(language) {
-  return String(language).toLowerCase() === "swahili"
-    ? "Reply only in Kiswahili. Do not add English translations unless the user asks."
-    : "Reply only in clear English. Do not add Swahili translations unless the user asks.";
+// The reply follows the language of the user's own message, not a UI setting.
+const LANGUAGE_RULE = "Reply in the same language the user wrote in: English gets English, Kiswahili gets Kiswahili, and a message mixing English, Kiswahili or Sheng gets a reply mixed the same way. Do not add translations unless the user asks.";
+const PLAIN_TEXT_RULE = "Write plain text only: no Markdown, no asterisks, no bold or italics, no headings. For lists, start each line with a dash.";
+
+function languageInstruction() {
+  return `${LANGUAGE_RULE} ${PLAIN_TEXT_RULE}`;
+}
+
+// Models still emit Markdown now and then; strip it so the chat never shows raw asterisks.
+function toPlainText(text) {
+  return String(text || "")
+    .replace(/\*{2,3}([^*\n]+?)\*{2,3}/g, "$1")
+    .replace(/__([^_\n]+?)__/g, "$1")
+    .replace(/(^|\s)\*(\S[^*\n]*?)\*(?=\s|[.,!?;:]|$)/g, "$1$2")
+    .replace(/^\s*[*•]\s+/gm, "- ")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*{2,}/g, "");
 }
 
 async function askOpenRouter(message, language = "English", jsonMode = false) {
@@ -2015,7 +2028,7 @@ const AGENT_TOOLS = [
   { type: "function", function: { name: "get_pending_piecework", description: "Return unpaid piecework totals. Pass a worker name to filter, omit for everyone.", parameters: { type: "object", properties: { worker: { type: "string" } }, required: [] } } }
 ];
 
-async function callToolModel(provider, messages, timeoutMs = 20_000) {
+async function callToolModel(provider, messages, timeoutMs = 20_000, withTools = true) {
   const isNvidia = provider === "nvidia";
   const endpoint = isNvidia ? "https://integrate.api.nvidia.com/v1/chat/completions" : "https://openrouter.ai/api/v1/chat/completions";
   const models = isNvidia ? [nvidiaModel()] : openRouterModels();
@@ -2026,7 +2039,7 @@ async function callToolModel(provider, messages, timeoutMs = 20_000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const res = await fetch(endpoint, { method: "POST", signal: controller.signal, headers, body: JSON.stringify({ model, temperature: 0.1, max_tokens: 1200, messages, tools: AGENT_TOOLS, tool_choice: "auto" }) });
+      const res = await fetch(endpoint, { method: "POST", signal: controller.signal, headers, body: JSON.stringify({ model, temperature: 0.1, max_tokens: 1200, messages, ...(withTools ? { tools: AGENT_TOOLS, tool_choice: "auto" } : {}) }) });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload?.error?.message || `AI tool request failed (${res.status})`);
       return { message: payload.choices?.[0]?.message, model: payload.model || model, provider };
@@ -2042,11 +2055,29 @@ async function callToolModel(provider, messages, timeoutMs = 20_000) {
 
 // Each signed-in account gets AI_DAILY_LIMIT AI requests per Kenyan calendar day
 // (EAT, UTC+3). The count lives in the account's own database so it survives restarts.
-const AI_DAILY_LIMIT = Number(process.env.AI_DAILY_LIMIT) || 5;
+const AI_DAILY_LIMIT = Number(process.env.AI_DAILY_LIMIT) || 10;
+// Comma-separated emails (e.g. a test account) that skip the daily limit.
+const AI_UNLIMITED_EMAILS = new Set(String(process.env.AI_UNLIMITED_EMAILS || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean));
 const AI_LIMIT_MESSAGE = `You have used all ${AI_DAILY_LIMIT} AI requests for today. Please wait until tomorrow to use the AI assistant again.`;
 const kenyaDay = () => new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10);
 
-function takeAiAllowance() {
+// Model and provider names stay server-side: knowing the exact model lets attackers
+// reuse prompt-injection tricks known to work on it. They are still logged.
+const AI_META_KEYS = new Set(["model", "models", "provider", "fallbacks"]);
+const AI_BUSY_MESSAGE = "The AI assistant is busy right now. Please try again in a moment.";
+
+function stripAiMeta(value) {
+  if (Array.isArray(value)) return value.map(stripAiMeta);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).filter(([key]) => !AI_META_KEYS.has(key)).map(([key, v]) => [key, stripAiMeta(v)]));
+}
+
+function stripAiMetaJson(text) {
+  try { return JSON.stringify(stripAiMeta(JSON.parse(text))); } catch { return text; }
+}
+
+function takeAiAllowance(account) {
+  if (AI_UNLIMITED_EMAILS.has(String(account?.email || "").toLowerCase())) return true;
   const day = kenyaDay();
   const used = get("SELECT count FROM ai_usage WHERE day = :day", { day })?.count || 0;
   if (used >= AI_DAILY_LIMIT) return false;
@@ -2069,7 +2100,8 @@ function buildAgentSystemPrompt(language) {
   const products  = safe(all("SELECT name FROM products ORDER BY created_at DESC LIMIT 20"), "name");
   return `You are Biashara GPT — the voice inside a Kenyan Jua Kali / SME business OS called ${company.name || "Biashara OS"}${company.city ? " in " + company.city : ""}.
 Today is ${dateStr} (${dowSw}). Currency: Kenyan Shilling (KSh / Ksh / shillings / bob).
-Reply in ${language}. If the user wrote in Kiswahili, Sheng, or mixed English/Swahili, mirror their language and keep it short and friendly — this is a fundi on a feature phone, not a corporate client.
+${LANGUAGE_RULE} Keep it short and friendly — this is a fundi on a feature phone, not a corporate client.
+${PLAIN_TEXT_RULE}
 
 HARD RULES:
 - Use tools for every data read or write. Never claim an action happened without a successful tool result.
@@ -2202,6 +2234,12 @@ async function runToolAgent(message, language, userId, channel, aiTimeoutMs = 20
           messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result).slice(0, 4000) });
         }
         answer = await callToolModel(provider, messages, aiTimeoutMs);
+      }
+      // Tools ran but no reply was written (round cap hit, or the model returned
+      // only tool calls): ask once more, with tools off, for the final answer.
+      if (!answer.message?.content && applied.length) {
+        messages.push({ role: "user", content: "Using the tool results above, now answer my original message directly. Do not call any more tools." });
+        answer = await callToolModel(provider, messages, aiTimeoutMs, false).catch(() => answer);
       }
       const text = answer.message?.content || (applied.length ? applied.map(a => a.result?.error ? `${a.name}: ${a.result.error}` : `✓ ${a.name}`).join("; ") : "");
       // If the provider produced nothing AND no tool was called, try the next one.
@@ -3142,7 +3180,8 @@ function dashboard() {
   const orders = all("SELECT o.*, c.name AS customer, i.invoice_no, i.status AS invoice_status, i.amount FROM orders o JOIN customers c ON c.id=o.customer_id LEFT JOIN invoices i ON i.order_id=o.id ORDER BY o.created_at DESC");
   const alerts = all("SELECT * FROM alerts ORDER BY created_at DESC LIMIT 10");
   const notifications = all("SELECT * FROM notifications ORDER BY created_at DESC LIMIT 20");
-  const aiLogs = all("SELECT ac.*, aa.intent, aa.structured_json FROM ai_conversations ac LEFT JOIN ai_actions aa ON aa.conversation_id=ac.id ORDER BY ac.created_at DESC LIMIT 12");
+  const aiLogs = all("SELECT ac.*, aa.intent, aa.structured_json FROM ai_conversations ac LEFT JOIN ai_actions aa ON aa.conversation_id=ac.id ORDER BY ac.created_at DESC LIMIT 12")
+    .map((log) => ({ ...log, structured_json: log.structured_json && stripAiMetaJson(log.structured_json) }));
   const tx = all("SELECT it.*, i.item_name, i.unit FROM inventory_transactions it JOIN inventory i ON i.id=it.inventory_id ORDER BY it.created_at DESC LIMIT 20");
 
   // P&L by period
@@ -3217,10 +3256,7 @@ function dashboard() {
     },
     integrations: getIntegrations(),
     ai: {
-      provider: activeAiProvider() === "nvidia" ? "NVIDIA NIM" : activeAiProvider() === "openrouter" ? "OpenRouter" : "Local parser",
-      status: activeAiProvider() === "local" ? "CONFIGURATION REQUIRED" : "CONNECTED",
-      model: activeAiProvider() === "nvidia" ? nvidiaModel() : process.env.OPENROUTER_MODEL || "openrouter/auto",
-      fallbacks: activeAiProvider() === "openrouter" ? openRouterModels().filter((model) => model !== (process.env.OPENROUTER_MODEL || "openrouter/auto")) : []
+      status: activeAiProvider() === "local" ? "CONFIGURATION REQUIRED" : "CONNECTED"
     },
     users: all("SELECT id, name, phone, role FROM users ORDER BY role")
   };
@@ -3233,13 +3269,12 @@ function getIntegrations() {
     { name: "Africa's Talking SMS", status: status(["AFRICASTALKING_USERNAME", "AFRICASTALKING_API_KEY"]), endpoint: "/api/webhooks/africastalking/sms", outbound: `${africasTalkingBase("api")}/version1/messaging`, mode: process.env.AFRICASTALKING_ENV || "sandbox" },
     { name: "Africa's Talking Voice", status: status(["AFRICASTALKING_USERNAME", "AFRICASTALKING_API_KEY", "AFRICASTALKING_VOICE_NUMBER"]), endpoint: "/api/webhooks/africastalking/voice", outbound: `${africasTalkingBase("voice")}/call`, mode: process.env.AFRICASTALKING_ENV || "sandbox" },
     { name: "M-Pesa Daraja", status: status(["MPESA_CONSUMER_KEY", "MPESA_CONSUMER_SECRET", "MPESA_SHORTCODE", "MPESA_PASSKEY", "MPESA_CALLBACK_URL"]), endpoint: "/api/webhooks/mpesa/callback", outbound: `${darajaBase()}/mpesa/stkpush/v1/processrequest`, mode: process.env.MPESA_ENV || "sandbox" },
-    { name: "NVIDIA NIM AI", status: nvidiaConfigured() ? "CONNECTED" : "CONFIGURATION REQUIRED", endpoint: "/api/ai/message", mode: nvidiaModel() },
-    { name: "OpenRouter AI", status: openRouterConfigured() ? "CONNECTED" : "CONFIGURATION REQUIRED", endpoint: "/api/ai/message", mode: process.env.OPENROUTER_MODEL || "openrouter/auto" }
+    { name: "AI Assistant", status: activeAiProvider() === "local" ? "CONFIGURATION REQUIRED" : "CONNECTED", endpoint: "/api/ai/message", mode: "live" }
   ];
 }
 
 function truncateForChannel(text, max = 420) {
-  const clean = String(text || "").replace(/\s+/g, " ").trim();
+  const clean = toPlainText(text).replace(/\s+/g, " ").trim();
   return clean.length > max ? `${clean.slice(0, max - 3)}...` : clean;
 }
 
@@ -3648,10 +3683,27 @@ async function handleRequest(req, res, account) {
     const isAtWebhook = url.pathname.startsWith("/api/webhooks/africastalking/");
     if (url.pathname.includes("/webhooks/") && !isAtWebhook && !verifyWebhook(req, raw)) return json(res, 401, { error: "Invalid webhook signature" });
     if (req.method === "POST" && url.pathname === "/api/ai/message") {
-      if (!takeAiAllowance()) return json(res, 429, { error: AI_LIMIT_MESSAGE });
-      return json(res, 200, await handleAiMessage(data));
+      if (!takeAiAllowance(account)) return json(res, 429, { error: AI_LIMIT_MESSAGE });
+      try {
+        const result = stripAiMeta(await handleAiMessage(data));
+        return json(res, 200, { ...result, response: toPlainText(result.response) });
+      } catch (err) {
+        console.error("AI message failed:", err.message);
+        return json(res, 503, { error: AI_BUSY_MESSAGE });
+      }
     }
-    if (req.method === "POST" && url.pathname === "/api/ai/test") return json(res, 200, await testAiProvider());
+    if (req.method === "DELETE" && url.pathname === "/api/ai/history") {
+      // Only accounts with their own workspace; the shared database holds other people's chats.
+      if (!account.tenant) return json(res, 400, { error: "Chat history can only be cleared for your own workspace." });
+      run("DELETE FROM ai_actions");
+      run("DELETE FROM ai_conversations");
+      return json(res, 200, { ok: true });
+    }
+    if (req.method === "POST" && url.pathname === "/api/ai/test") {
+      const result = await testAiProvider();
+      if (!result.ok) console.error("AI test failed:", result.error);
+      return json(res, 200, result.ok ? { ok: true, status: "CONNECTED" } : { ok: false, status: "ERROR", error: AI_BUSY_MESSAGE });
+    }
     if (req.method === "POST" && url.pathname === "/api/webhooks/africastalking/sms") {
       const result = await handleAiMessage({ message: data.text || data.message, channel: "SMS", phone: data.from || data.phoneNumber || "+254700000004" });
       return json(res, 200, result);
@@ -3890,8 +3942,8 @@ async function handleRequest(req, res, account) {
     }
     // ========== RECEIPT OCR ==========
     if (req.method === "POST" && url.pathname === "/api/ai/receipt") {
-      if (!takeAiAllowance()) return json(res, 429, { error: AI_LIMIT_MESSAGE });
-      const result = await extractReceiptFromImage(data);
+      if (!takeAiAllowance(account)) return json(res, 429, { error: AI_LIMIT_MESSAGE });
+      const result = stripAiMeta(await extractReceiptFromImage(data));
       return json(res, result?.error ? 400 : 200, result);
     }
     return json(res, 404, { error: "Not found" });

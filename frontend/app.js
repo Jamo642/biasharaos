@@ -322,6 +322,9 @@ function renderSvgBars(target, rows, labelKey = "label", color = "#22d3ee") {
 
 function actionReceipt(action) {
   if (!action || action.intent === "unknown") return null;
+  // Plain answers and lookups saved nothing, so show the AI's reply instead of a receipt.
+  const intent = String(action.intent || "");
+  if (intent === "answer" || /^(get|list)_/.test(intent) || /missing|required/.test(intent)) return null;
   try {
     const data = JSON.parse(action.structured_json || "{}");
     if (action.intent === "sale") return `Sale: ${data.quantity}${data.unit || ""} ${data.item || "stock"} for KSh ${Number(data.amount || 0).toLocaleString()}`;
@@ -1922,7 +1925,7 @@ function render() {
   const aiActions = el("aiActions");
   if (aiActions) aiActions.innerHTML = (data.aiLogs || []).map((a) => `
     <div class="event">
-      <strong>${escapeHtml(a.intent || "message")} via ${escapeHtml(a.channel)}</strong>
+      <strong>${escapeHtml(a.intent || "message")}</strong>
       <span>${escapeHtml(a.message ? a.message.slice(0, 80) : "")}</span>
       <small>${new Date(a.created_at).toLocaleString()}</small>
     </div>
@@ -2069,7 +2072,8 @@ el("supplierPaymentForm")?.addEventListener("submit", async (event) => {
 el("aiForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const message = el("aiInput").value.trim();
-  const language = el("aiLanguage").value;
+  // The server replies in whatever language the message is written in.
+  const language = "auto";
   if (!message) return;
   const log = el("chatLog");
   log.dataset.hasMessages = "true";
@@ -2083,7 +2087,7 @@ el("aiForm").addEventListener("submit", async (event) => {
     const pending = log.querySelector(".pending");
     if (pending) pending.remove();
     await refresh();
-    log.insertAdjacentHTML("beforeend", `<div class="bubble">${escapeHtml(result.response)}${result.model ? `<small class="model-used">Model: ${escapeHtml(result.model)}</small>` : ""}</div>`);
+    log.insertAdjacentHTML("beforeend", `<div class="bubble">${escapeHtml(result.response)}</div>`);
     log.scrollTop = log.scrollHeight;
   } catch (err) {
     const pending = log.querySelector(".pending");
@@ -2103,10 +2107,20 @@ el("testDaraja")?.addEventListener("click", async () => {
   } catch (err) { alert(`Daraja test failed: ${err.message}`); }
 });
 
+el("clearAiHistory")?.addEventListener("click", async () => {
+  if (!confirm("Delete all your AI chat history? Records the AI already saved (sales, stock, etc.) are kept.")) return;
+  try {
+    await api("/api/ai/history", { method: "DELETE" });
+    const log = el("chatLog");
+    delete log.dataset.hasMessages;
+    await refresh();
+  } catch (err) { alert(`Could not delete chat history: ${err.message}`); }
+});
+
 el("testOpenRouter")?.addEventListener("click", async () => {
   try {
     const result = await api("/api/ai/test", { method: "POST", body: {} });
-    alert(result.ok ? `AI works. Provider: ${result.provider}. Model: ${result.model}` : `AI failed: ${result.error || result.status}`);
+    alert(result.ok ? "AI assistant is working." : `AI failed: ${result.error || result.status}`);
     await refresh();
   } catch (err) { alert(`AI test failed: ${err.message}`); }
 });
